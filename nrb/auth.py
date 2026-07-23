@@ -83,7 +83,8 @@ def render_sidebar_auth():
 
 def render_first_run_setup():
     """Force creation of the first admin account when no users exist."""
-    st.title("First-time setup")
+    from nrb import ui
+    ui.header("🪪", "First-time setup")
     st.info(
         "No user accounts exist yet. Create the administrator account to continue."
     )

@@ -4,11 +4,11 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from nrb import config, data, reportcfg
+from nrb import config, data, reportcfg, ui
 
 
 def render():
-    st.title("📊 Live Dashboard")
+    ui.header("📊", "Live Dashboard", "Live totals straight from the daily form")
     _, res = data.load_or_stop()
     data.refresh_button()
     clean = res.clean
@@ -27,12 +27,18 @@ def render():
 
     cfg = reportcfg.get_report_config()
 
-    # KPI row: one metric per report block (config-driven).
+    # KPI row: one metric per report block, with change vs the previous
+    # period of equal length.
+    span = (pd.Timestamp(end) - pd.Timestamp(start)).days + 1
+    prev = clean[(clean["date"] >= pd.Timestamp(start) - pd.Timedelta(days=span))
+                 & (clean["date"] < pd.Timestamp(start))]
     blocks = [(g, b) for g in cfg["groups"] for b in g["blocks"]]
     cols = st.columns(len(blocks)) if blocks else []
     for col, (g, b) in zip(cols, blocks):
         val = reportcfg.compute_block(df, b)["total"]
-        col.metric(b["title"].title(), f"{val:,}")
+        before = reportcfg.compute_block(prev, b)["total"]
+        col.metric(b["title"].title(), f"{val:,}",
+                   delta=f"{val - before:+,} vs prev. {span}d" if before or val else None)
 
     tab_trend, tab_sections, tab_detail = st.tabs(
         ["Trends", "Section activity", "Field breakdown"])

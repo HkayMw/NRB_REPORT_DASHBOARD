@@ -4,11 +4,11 @@ and scheduled-vs-reported comparison."""
 import pandas as pd
 import streamlit as st
 
-from nrb import cleaning, config, data, db, scheduling, weeks
+from nrb import cleaning, config, data, db, scheduling, ui, weeks
 
 
 def render():
-    st.title("✅ Reporting Compliance")
+    ui.header("✅", "Reporting Compliance", "Who reported, what was covered, what's missing")
     _, res = data.load_or_stop()
     data.refresh_button()
     clean = res.clean
