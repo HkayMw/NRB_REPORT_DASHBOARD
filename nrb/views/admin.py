@@ -1,21 +1,20 @@
-"""Admin: data source, roster, report layout, users, backup."""
+"""Admin: data source, roster, report layout, users, database."""
 
 import json
-import os
 
 import pandas as pd
 import streamlit as st
 
-from nrb import auth, config, data, db, reportcfg, sheets
+from nrb import auth, config, data, db, reportcfg, sheets, ui
 
 
 def render():
-    st.title("⚙️ Administration")
+    ui.header("⚙️", "Administration", "Data source, roster, report layout, users, database")
     if not auth.is_admin():
         st.warning("Administrators only — log in from the sidebar.")
         return
-    tab_src, tab_roster, tab_layout, tab_users, tab_backup = st.tabs(
-        ["Data source", "Roster", "Report layout", "Users", "Backup"])
+    tab_src, tab_roster, tab_layout, tab_users, tab_db = st.tabs(
+        ["Data source", "Roster", "Report layout", "Users", "Database"])
     with tab_src:
         _source_tab()
     with tab_roster:
@@ -24,8 +23,8 @@ def render():
         _layout_tab()
     with tab_users:
         _users_tab()
-    with tab_backup:
-        _backup_tab()
+    with tab_db:
+        _database_tab()
 
 
 def _source_tab():
@@ -151,9 +150,13 @@ def _users_tab():
                 st.success("User created.")
                 st.rerun()
 
+    if not users:
+        return
     st.markdown("**Edit user**")
     pick = st.selectbox("User", [u["username"] for u in users])
-    user = next(u for u in users if u["username"] == pick)
+    user = next((u for u in users if u["username"] == pick), None)
+    if user is None:
+        return
     me = auth.current_user()
     c1, c2, c3 = st.columns(3)
     new_pw = c1.text_input("New password (leave blank to keep)", type="password",
@@ -176,20 +179,29 @@ def _users_tab():
             st.rerun()
 
 
-def _backup_tab():
-    st.caption(
-        "⚠️ On Streamlit Community Cloud the local disk is wiped on every reboot "
-        "or redeploy — users, teams, schedules and settings live in this SQLite "
-        "file. Download a backup after making changes, and restore it after a "
-        "redeploy."
-    )
-    if os.path.exists(db.DB_PATH):
-        with open(db.DB_PATH, "rb") as f:
-            st.download_button("⬇️ Download database backup", f.read(),
-                               file_name="nrb_dashboard_backup.db")
-    up = st.file_uploader("Restore from backup (.db)", type=["db"])
+def _database_tab():
+    ok, detail = db.ping()
+    if ok:
+        st.success(f"Connected to MongoDB · {detail}")
+        st.caption("Users, teams, schedules and settings persist in Atlas — "
+                   "nothing is lost on app restarts or redeploys. Form responses "
+                   "stay in Google Sheets as before.")
+    else:
+        st.error(f"MongoDB connection problem: {detail}")
+
+    st.markdown("**Safety backup (JSON)**")
+    st.caption("Optional periodic snapshot of app data (accounts, teams, "
+               "schedules, settings) — e.g. before big changes.")
+    if ok:
+        st.download_button(
+            "⬇️ Download JSON backup",
+            json.dumps(db.export_all(), indent=2, default=str),
+            file_name="nrb_dashboard_backup.json", mime="application/json")
+    up = st.file_uploader("Restore from backup (.json)", type=["json"])
     if up is not None and st.button("Restore now (overwrites current data)"):
-        with open(db.DB_PATH, "wb") as f:
-            f.write(up.getbuffer())
-        st.success("Restored — reloading.")
-        st.rerun()
+        try:
+            db.import_all(json.load(up))
+            st.success("Restored.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Restore failed: {e}")

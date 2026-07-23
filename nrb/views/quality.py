@@ -2,11 +2,11 @@
 
 import streamlit as st
 
-from nrb import config, data
+from nrb import config, data, ui
 
 
 def render():
-    st.title("🧹 Data Quality")
+    ui.header("🧹", "Data Quality", "What the cleaning rules caught in the raw responses")
     _, res = data.load_or_stop()
     data.refresh_button()
 

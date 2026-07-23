@@ -5,11 +5,11 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from nrb import auth, config, data, db, export, reportcfg, weeks
+from nrb import auth, config, data, db, export, reportcfg, ui, weeks
 
 
 def render():
-    st.title("📑 Monthly Report")
+    ui.header("📑", "Monthly Report", "Preview any month and download the office workbook")
     _, res = data.load_or_stop()
     data.refresh_button()
     clean = res.clean
