@@ -26,13 +26,34 @@ month days only), the workbook is values-only and already named
   section each team reports as), generate a fair rotation (longest-away-first,
   balanced totals), tweak manually, save, and copy the WhatsApp message.
 - **Real auth** — per-user accounts (PBKDF2-hashed passwords, admin/viewer
-  roles) in SQLite. Dashboards can be public or login-only (Admin toggle);
-  export, scheduling and admin always require login.
+  roles) stored in MongoDB Atlas. Dashboards can be public or login-only
+  (Admin toggle); export, scheduling and admin always require login.
+- **Persistent storage** — users, teams, schedules and settings live in
+  MongoDB Atlas, so nothing is lost on app restarts or redeploys. Form
+  responses stay in Google Sheets as before.
+
+## Database setup (one-time, free)
+
+1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas)
+   (Shared / M0 tier).
+2. **Database Access** → create a database user with a password.
+3. **Network Access** → allow `0.0.0.0/0` (needed for Streamlit Cloud).
+4. **Database → Connect → Drivers** → copy the `mongodb+srv://…` string.
+5. Give it to the app as the `MONGODB_URI` secret (see below).
+
+For a throwaway local demo without Atlas, set
+`MONGODB_URI = "mongomock://local"` — in-memory, data lost on restart.
 
 ## Run locally
 
 ```bash
 pip install -r requirements.txt
+```
+
+Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml`, paste
+your `MONGODB_URI`, then:
+
+```bash
 streamlit run app.py
 ```
 
@@ -44,12 +65,11 @@ sidebar. Data source defaults to the office responses sheet; change it in
 
 1. Push this folder to a GitHub repo.
 2. share.streamlit.io → New app → pick the repo, main file `app.py`.
-3. Open the deployed app, create the admin account, configure.
+3. App → Settings → **Secrets** → add `MONGODB_URI = "mongodb+srv://…"`.
+4. Open the deployed app, create the admin account, configure.
 
-**Important:** Community Cloud storage is ephemeral — the SQLite database
-(users, teams, schedules, settings) is wiped on reboot/redeploy. Use
-**Admin → Backup** to download the `.db` after changes and restore it after a
-redeploy. (Form data is never at risk — it lives in Google Sheets.)
+**Admin → Database** shows connection status and offers an optional JSON
+backup/restore of app data (accounts, teams, schedules, settings).
 
 ## Data rules (agreed)
 

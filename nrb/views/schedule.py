@@ -6,11 +6,11 @@ from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 
-from nrb import auth, config, db, scheduling, weeks
+from nrb import auth, config, db, scheduling, ui, weeks
 
 
 def render():
-    st.title("🗓️ Team Scheduling")
+    ui.header("🗓️", "Team Scheduling", "Fair weekly allocations and the WhatsApp message")
     if not auth.is_admin():
         st.warning("Scheduling is restricted to administrators — log in from the sidebar.")
         return
