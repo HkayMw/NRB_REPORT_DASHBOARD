@@ -1,16 +1,21 @@
 """Live dashboard: KPIs, trends and section breakdowns."""
 
-import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from nrb import config, data, reportcfg, ui
+from nrb import config, data, ui
+from nrb.application.services.load_reporting_data import ReportingDataService
+from nrb.application.services.report_configuration import ReportConfigService
+from nrb.domain import reporting_analytics
 
 
-def render():
+def render(
+    report_config_service: ReportConfigService,
+    reporting_data_service: ReportingDataService,
+):
     ui.header("📊", "Live Dashboard", "Live totals straight from the daily form")
-    _, res = data.load_or_stop()
-    data.refresh_button()
+    _, res = data.load_or_stop(reporting_data_service)
+    data.refresh_button(reporting_data_service.clear_cache)
     clean = res.clean
     if clean.empty:
         st.info("No clean submissions found yet.")
@@ -25,63 +30,51 @@ def render():
         st.warning("No submissions in the selected range.")
         return
 
-    cfg = reportcfg.get_report_config()
+    cfg = report_config_service.get_report_config()
 
-    # KPI row: one metric per report block, with change vs the previous
-    # period of equal length.
-    span = (pd.Timestamp(end) - pd.Timestamp(start)).days + 1
-    prev = clean[(clean["date"] >= pd.Timestamp(start) - pd.Timedelta(days=span))
-                 & (clean["date"] < pd.Timestamp(start))]
     blocks = [(g, b) for g in cfg["groups"] for b in g["blocks"]]
+    metrics = reporting_analytics.overview_metrics(clean, df, start, end, cfg)
     cols = st.columns(len(blocks)) if blocks else []
-    for col, (g, b) in zip(cols, blocks):
-        val = reportcfg.compute_block(df, b)["total"]
-        before = reportcfg.compute_block(prev, b)["total"]
-        col.metric(b["title"].title(), f"{val:,}",
-                   delta=f"{val - before:+,} vs prev. {span}d" if before or val else None)
+    for col, metric in zip(cols, metrics):
+        delta = (
+            f"{metric.value - metric.previous_value:+,} vs prev. {metric.period_days}d"
+            if metric.previous_value or metric.value
+            else None
+        )
+        col.metric(metric.title.title(), f"{metric.value:,}", delta=delta)
 
     tab_trend, tab_sections, tab_detail = st.tabs(
-        ["Trends", "Section activity", "Field breakdown"])
+        ["Trends", "Section activity", "Field breakdown"]
+    )
 
     with tab_trend:
         titles = [b["title"] for _, b in blocks]
         chosen = st.multiselect("Show", titles, default=titles[:2])
-        rows = []
-        for g, b in blocks:
-            if b["title"] not in chosen:
-                continue
-            fields = [f for r in b["rows"] for f in r["fields"]]
-            daily = df.groupby("date")[fields].sum().sum(axis=1)
-            for d, v in daily.items():
-                rows.append({"date": d, "metric": b["title"], "value": v})
-        if rows:
-            tdf = pd.DataFrame(rows)
+        tdf = reporting_analytics.overview_trends(df, cfg, chosen)
+        if not tdf.empty:
             fig = px.line(tdf, x="date", y="value", color="metric", markers=True)
             fig.update_layout(legend_title="", margin=dict(t=10))
             st.plotly_chart(fig, width="stretch")
 
     with tab_sections:
-        counts = df.groupby(["date", "section"]).size().reset_index(name="submissions")
+        counts, section_summary = reporting_analytics.section_activity(df)
         fig = px.bar(counts, x="date", y="submissions", color="section")
         fig.update_layout(legend_title="", margin=dict(t=10))
         st.plotly_chart(fig, width="stretch")
-        st.dataframe(
-            df.groupby("section").agg(
-                submissions=("date", "count"),
-                first=("date", "min"), last=("date", "max"),
-            ).reset_index(),
-            width="stretch", hide_index=True,
-        )
+        st.dataframe(section_summary, width="stretch", hide_index=True)
 
     with tab_detail:
         section = st.selectbox("Section", list(config.SECTION_FIELDS))
-        fields = config.SECTION_FIELDS[section]
         sdf = df[df["section"] == section]
         if sdf.empty:
             st.info("No submissions for this section in the selected range.")
         else:
-            totals = sdf[fields].sum().astype(int).sort_values()
-            fig = px.bar(x=totals.values, y=totals.index, orientation="h",
-                         labels={"x": "Total", "y": ""})
+            totals = reporting_analytics.section_field_totals(df, section)
+            fig = px.bar(
+                x=totals.values,
+                y=totals.index,
+                orientation="h",
+                labels={"x": "Total", "y": ""},
+            )
             fig.update_layout(margin=dict(t=10))
             st.plotly_chart(fig, width="stretch")

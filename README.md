@@ -46,6 +46,8 @@ For a throwaway local demo without Atlas, set
 
 ## Run locally
 
+Supported Python version: **3.11**.
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -55,6 +57,23 @@ your `MONGODB_URI`, then:
 
 ```bash
 streamlit run app.py
+```
+
+## Development checks
+
+Install development tools and runtime dependencies:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+Run the same checks used by CI:
+
+```bash
+python -m pytest tests -q
+python -m ruff check .
+python -m ruff format --check app.py nrb tests
+python -m mypy
 ```
 
 First run: the app asks you to create the admin account, then log in from the

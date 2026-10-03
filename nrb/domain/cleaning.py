@@ -52,14 +52,23 @@ def clean_responses(df: pd.DataFrame, roster_names: list, today=None) -> CleanRe
     # Tolerate header drift on the two whitespace-sensitive axes.
     rename = {}
     for col in df.columns:
-        for f in config.ALL_NUMERIC_FIELDS + [config.TIMESTAMP_COL, config.NAME_COL,
-                                              config.DATE_COL, config.SECTION_COL]:
-            if col != f and " ".join(col.split()).lower() == " ".join(f.split()).lower():
+        for f in config.ALL_NUMERIC_FIELDS + [
+            config.TIMESTAMP_COL,
+            config.NAME_COL,
+            config.DATE_COL,
+            config.SECTION_COL,
+        ]:
+            if (
+                col != f
+                and " ".join(col.split()).lower() == " ".join(f.split()).lower()
+            ):
                 rename[col] = f
     if rename:
         df = df.rename(columns=rename)
 
-    df[config.TIMESTAMP_COL] = pd.to_datetime(df.get(config.TIMESTAMP_COL), errors="coerce")
+    df[config.TIMESTAMP_COL] = pd.to_datetime(
+        df.get(config.TIMESTAMP_COL), errors="coerce"
+    )
     df[config.DATE_COL] = pd.to_datetime(df.get(config.DATE_COL), errors="coerce")
     for f in config.ALL_NUMERIC_FIELDS:
         if f not in df.columns:
@@ -83,17 +92,27 @@ def clean_responses(df: pd.DataFrame, roster_names: list, today=None) -> CleanRe
     today = pd.Timestamp(today) if today else pd.Timestamp.now().normalize()
 
     unknown = df[~df["all_names_known"]]
-    clean = df[df["all_names_known"] & df[config.DATE_COL].notna() & (df["section"] != "")].copy()
+    clean = df[
+        df["all_names_known"] & df[config.DATE_COL].notna() & (df["section"] != "")
+    ].copy()
 
     future = clean[clean[config.DATE_COL] > today]
     for _, r in future.iterrows():
-        issues.append({"issue": "Future date", "date": r[config.DATE_COL],
-                       "name": r[config.NAME_COL], "section": r["section"]})
+        issues.append(
+            {
+                "issue": "Future date",
+                "date": r[config.DATE_COL],
+                "name": r[config.NAME_COL],
+                "section": r["section"],
+            }
+        )
 
     # Deduplicate: same (date, section, name-set) -> latest timestamp wins.
     clean["name_key"] = clean["names_list"].apply(lambda ns: "|".join(sorted(ns)))
     clean = clean.sort_values(config.TIMESTAMP_COL)
-    dup_mask = clean.duplicated(subset=[config.DATE_COL, "section", "name_key"], keep="last")
+    dup_mask = clean.duplicated(
+        subset=[config.DATE_COL, "section", "name_key"], keep="last"
+    )
     dropped = clean[dup_mask]
     clean = clean[~dup_mask].copy()
 
@@ -101,20 +120,28 @@ def clean_responses(df: pd.DataFrame, roster_names: list, today=None) -> CleanRe
     for (d, s), grp in clean.groupby([config.DATE_COL, "section"]):
         if len(grp) > 1:
             sets = [set(ns) for ns in grp["names_list"]]
-            overlap = any(a & b for i, a in enumerate(sets) for b in sets[i + 1:])
+            overlap = any(a & b for i, a in enumerate(sets) for b in sets[i + 1 :])
             if overlap:
-                issues.append({
-                    "issue": "Same person in multiple submissions (possible double count)",
-                    "date": d, "section": s,
-                    "name": " / ".join(grp[config.NAME_COL].astype(str)),
-                })
+                issues.append(
+                    {
+                        "issue": "Same person in multiple submissions (possible double count)",
+                        "date": d,
+                        "section": s,
+                        "name": " / ".join(grp[config.NAME_COL].astype(str)),
+                    }
+                )
 
     for f in config.ALL_NUMERIC_FIELDS:
         bad = clean[clean[f].notna() & ((clean[f] < 0) | (clean[f] % 1 != 0))]
         for _, r in bad.iterrows():
-            issues.append({"issue": f"Suspicious value in '{f}' ({r[f]})",
-                           "date": r[config.DATE_COL], "name": r[config.NAME_COL],
-                           "section": r["section"]})
+            issues.append(
+                {
+                    "issue": f"Suspicious value in '{f}' ({r[f]})",
+                    "date": r[config.DATE_COL],
+                    "name": r[config.NAME_COL],
+                    "section": r["section"],
+                }
+            )
 
     clean["date"] = clean[config.DATE_COL].dt.normalize()
     return CleanResult(

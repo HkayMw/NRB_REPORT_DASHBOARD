@@ -8,7 +8,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from nrb import config, reportcfg, weeks
+from nrb import config
+from nrb.domain import report_config as reportcfg, weeks
 
 THIN = Side(style="thin", color="9CA3AF")
 BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -36,17 +37,24 @@ def _style(ws, cell_range, font=None, fill=None, border=BOX, align=None):
                 c.alignment = align
 
 
-def build_monthly_workbook(clean: pd.DataFrame, year: int, month: int,
-                           cfg=None, planned_activities: str = "",
-                           compiled_by: str = "") -> BytesIO:
-    cfg = cfg or reportcfg.get_report_config()
+def build_monthly_workbook(
+    clean: pd.DataFrame,
+    year: int,
+    month: int,
+    cfg=None,
+    planned_activities: str = "",
+    compiled_by: str = "",
+) -> BytesIO:
+    cfg = cfg or reportcfg.DEFAULT_REPORT_CONFIG
     wk_list = weeks.month_weeks(year, month)
     month_name = date(year, month, 1).strftime("%B %Y")
 
     # Per-week computed values: week_no -> {(gi, bi): {"rows": [...], "total": n}}
     week_values = {}
     for wno, start, end in wk_list:
-        mask = (clean["date"] >= pd.Timestamp(start)) & (clean["date"] <= pd.Timestamp(end))
+        mask = (clean["date"] >= pd.Timestamp(start)) & (
+            clean["date"] <= pd.Timestamp(end)
+        )
         wdf = clean[mask]
         week_values[wno] = {
             (gi, bi): reportcfg.compute_block(wdf, block)
@@ -55,11 +63,19 @@ def build_monthly_workbook(clean: pd.DataFrame, year: int, month: int,
         }
 
     wb = Workbook()
-    _summary_sheet(wb.active, cfg, wk_list, week_values, month_name,
-                   planned_activities, compiled_by)
+    _summary_sheet(
+        wb.active,
+        cfg,
+        wk_list,
+        week_values,
+        month_name,
+        planned_activities,
+        compiled_by,
+    )
     for wno, start, end in wk_list:
-        _week_sheet(wb.create_sheet(f"Week {wno}"), cfg, wno, start, end,
-                    week_values[wno])
+        _week_sheet(
+            wb.create_sheet(f"Week {wno}"), cfg, wno, start, end, week_values[wno]
+        )
 
     buf = BytesIO()
     wb.save(buf)
@@ -67,11 +83,12 @@ def build_monthly_workbook(clean: pd.DataFrame, year: int, month: int,
     return buf
 
 
-def _summary_sheet(ws, cfg, wk_list, week_values, month_name,
-                   planned_activities, compiled_by):
+def _summary_sheet(
+    ws, cfg, wk_list, week_values, month_name, planned_activities, compiled_by
+):
     ws.title = "Report Summary"
     cols = reportcfg.summary_columns(cfg)
-    groups = []  # [(summary_title, [(label, ref), ...])]
+    groups: list[tuple[str, list[tuple[str, tuple[int, int, int | str]]]]] = []
     for gtitle, label, ref in cols:
         if not groups or groups[-1][0] != gtitle:
             groups.append((gtitle, []))
@@ -87,8 +104,9 @@ def _summary_sheet(ws, cfg, wk_list, week_values, month_name,
     for gtitle, gcols in groups:
         span = 1 + len(gcols)
         group_spans.append((col, span))
-        ws.merge_cells(start_row=3, start_column=col, end_row=3,
-                       end_column=col + span - 1)
+        ws.merge_cells(
+            start_row=3, start_column=col, end_row=3, end_column=col + span - 1
+        )
         c = ws.cell(3, col, gtitle)
         c.fill, c.font, c.alignment = BAND_FILL, BAND_FONT, CENTER
         ws.cell(4, col, "DATE")
@@ -97,8 +115,13 @@ def _summary_sheet(ws, cfg, wk_list, week_values, month_name,
         col += span
     last_col = col - 1
     _style(ws, f"A3:{get_column_letter(last_col)}4", border=BOX)
-    _style(ws, f"A4:{get_column_letter(last_col)}4", font=HEAD_FONT,
-           fill=HEAD_FILL, align=CENTER)
+    _style(
+        ws,
+        f"A4:{get_column_letter(last_col)}4",
+        font=HEAD_FONT,
+        fill=HEAD_FILL,
+        align=CENTER,
+    )
 
     # Week rows + totals.
     first_data_row = 5
@@ -118,15 +141,25 @@ def _summary_sheet(ws, cfg, wk_list, week_values, month_name,
         ws.cell(tot_row, col, "TOTALS")
         for j, (label, (gi, bi, ri)) in enumerate(gcols):
             total = sum(
-                (week_values[w][(gi, bi)]["total"] if ri == "total"
-                 else week_values[w][(gi, bi)]["rows"][ri][1])
+                (
+                    week_values[w][(gi, bi)]["total"]
+                    if ri == "total"
+                    else week_values[w][(gi, bi)]["rows"][ri][1]
+                )
                 for w, _, _ in wk_list
             )
             ws.cell(tot_row, col + 1 + j, total).alignment = CENTER
         col += 1 + len(gcols)
-    _style(ws, f"A{first_data_row}:{get_column_letter(last_col)}{tot_row - 1}", border=BOX)
-    _style(ws, f"A{tot_row}:{get_column_letter(last_col)}{tot_row}",
-           font=TOTAL_FONT, fill=TOTAL_FILL, border=BOX)
+    _style(
+        ws, f"A{first_data_row}:{get_column_letter(last_col)}{tot_row - 1}", border=BOX
+    )
+    _style(
+        ws,
+        f"A{tot_row}:{get_column_letter(last_col)}{tot_row}",
+        font=TOTAL_FONT,
+        fill=TOTAL_FILL,
+        border=BOX,
+    )
 
     # Footer text.
     r = tot_row + 2
@@ -164,11 +197,21 @@ def _week_sheet(ws, cfg, wno, start, end, values):
         head_row = r
         for side, block in enumerate(blocks):
             col = 1 + side * 2
-            ws.merge_cells(start_row=head_row, start_column=col,
-                           end_row=head_row, end_column=col + 1)
+            ws.merge_cells(
+                start_row=head_row,
+                start_column=col,
+                end_row=head_row,
+                end_column=col + 1,
+            )
             ws.cell(head_row, col, block["title"])
-        _style(ws, f"A{head_row}:D{head_row}", font=HEAD_FONT, fill=HEAD_FILL,
-               align=CENTER, border=BOX)
+        _style(
+            ws,
+            f"A{head_row}:D{head_row}",
+            font=HEAD_FONT,
+            fill=HEAD_FILL,
+            align=CENTER,
+            border=BOX,
+        )
         r += 1
 
         n_rows = max(len(b.get("rows", [])) for b in blocks)
@@ -193,9 +236,11 @@ def _week_sheet(ws, cfg, wno, start, end, values):
             r += 1
         r += 1  # gap between groups
 
-    for col, w in zip("ABCD", (30, 10, 30, 10)):
-        ws.column_dimensions[col].width = w
+    for column_letter, width in zip("ABCD", (30, 10, 30, 10)):
+        ws.column_dimensions[column_letter].width = width
 
 
 def suggested_filename(year: int, month: int) -> str:
-    return f"{date(year, month, 1).strftime('%B').upper()} MONTHLY REPORT_MZUZU NRB.xlsx"
+    return (
+        f"{date(year, month, 1).strftime('%B').upper()} MONTHLY REPORT_MZUZU NRB.xlsx"
+    )

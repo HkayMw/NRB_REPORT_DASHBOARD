@@ -15,7 +15,9 @@ def _csv_export_url(sheet_url: str) -> str:
     doc_id = m.group(1)
     gid_m = re.search(r"[#&?]gid=(\d+)", sheet_url)
     gid = gid_m.group(1) if gid_m else "0"
-    return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
+    return (
+        f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
+    )
 
 
 @st.cache_data(ttl=300, show_spinner="Fetching latest form responses…")

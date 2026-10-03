@@ -3,12 +3,15 @@
 import streamlit as st
 
 from nrb import config, data, ui
+from nrb.application.services.load_reporting_data import ReportingDataService
 
 
-def render():
-    ui.header("🧹", "Data Quality", "What the cleaning rules caught in the raw responses")
-    _, res = data.load_or_stop()
-    data.refresh_button()
+def render(reporting_data_service: ReportingDataService):
+    ui.header(
+        "🧹", "Data Quality", "What the cleaning rules caught in the raw responses"
+    )
+    _, res = data.load_or_stop(reporting_data_service)
+    data.refresh_button(reporting_data_service.clear_cache)
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Clean submissions", len(res.clean))
@@ -23,8 +26,10 @@ def render():
         st.dataframe(res.issues, width="stretch", hide_index=True)
 
     st.subheader("Duplicates removed (latest submission kept)")
-    st.caption("Same date + section + same people, submitted more than once — "
-               "the earlier copies below were dropped as corrections.")
+    st.caption(
+        "Same date + section + same people, submitted more than once — "
+        "the earlier copies below were dropped as corrections."
+    )
     if res.dropped_duplicates.empty:
         st.success("No duplicate submissions.")
     else:
@@ -32,8 +37,10 @@ def render():
         st.dataframe(res.dropped_duplicates[cols], width="stretch", hide_index=True)
 
     st.subheader("Excluded rows (names not on the roster)")
-    st.caption("Mostly the old free-text era. Fix the roster in Admin → Roster "
-               "if a legitimate current name is being excluded.")
+    st.caption(
+        "Mostly the old free-text era. Fix the roster in Admin → Roster "
+        "if a legitimate current name is being excluded."
+    )
     if res.unknown_names.empty:
         st.success("Every row matches the roster.")
     else:

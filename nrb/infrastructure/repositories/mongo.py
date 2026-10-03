@@ -13,6 +13,7 @@ documents are returned as plain dicts with a string "id" key.
 """
 
 import os
+import logging
 from datetime import datetime, timezone
 
 import streamlit as st
@@ -21,6 +22,7 @@ from bson import ObjectId
 from nrb import config
 
 DB_NAME = "nrb_dashboard"
+logger = logging.getLogger("nrb.infrastructure.mongo")
 
 
 def get_uri():
@@ -41,8 +43,10 @@ def configured() -> bool:
 def _client(uri: str):
     if uri.startswith("mongomock://"):
         import mongomock
+
         return mongomock.MongoClient()
     from pymongo import MongoClient
+
     return MongoClient(uri, serverSelectionTimeoutMS=8000)
 
 
@@ -54,11 +58,15 @@ def ping() -> tuple:
     """(ok, detail) — used by the Admin page to show connection status."""
     try:
         _client(get_uri()).admin.command("ping")
-        host = "in-memory mongomock" if get_uri().startswith("mongomock://") \
+        host = (
+            "in-memory mongomock"
+            if get_uri().startswith("mongomock://")
             else get_uri().split("@")[-1].split("/")[0].split("?")[0]
+        )
         return True, host
-    except Exception as e:
-        return False, str(e)
+    except Exception:
+        logger.exception("MongoDB ping failed")
+        return False, "Connection check failed. See application logs."
 
 
 def _now():
@@ -86,16 +94,30 @@ def init_db():
     db.schedules.create_index("week_start", unique=True)
     if db.staff.count_documents({}) == 0:
         db.staff.insert_many(
-            [{"form_name": fn, "full_name": full, "active": 1}
-             for fn, full in config.DEFAULT_ROSTER])
+            [
+                {"form_name": fn, "full_name": full, "active": 1}
+                for fn, full in config.DEFAULT_ROSTER
+            ]
+        )
     if db.teams.count_documents({}) == 0:
         db.teams.insert_many(
-            [{"name": name, "reports_as_section": section, "min_size": mn,
-              "max_size": mx, "pinned_members": [], "active": 1, "sort_order": i}
-             for i, (name, section, mn, mx) in enumerate(config.DEFAULT_TEAMS)])
+            [
+                {
+                    "name": name,
+                    "reports_as_section": section,
+                    "min_size": mn,
+                    "max_size": mx,
+                    "pinned_members": [],
+                    "active": 1,
+                    "sort_order": i,
+                }
+                for i, (name, section, mn, mx) in enumerate(config.DEFAULT_TEAMS)
+            ]
+        )
 
 
 # ---------- settings ----------
+
 
 def get_setting(key, default=None):
     doc = _db().settings.find_one({"_id": key})
@@ -108,6 +130,7 @@ def set_setting(key, value):
 
 # ---------- users ----------
 
+
 def count_users():
     return _db().users.count_documents({})
 
@@ -116,16 +139,25 @@ def get_user(username):
     return _out(_db().users.find_one({"username": username.strip(), "active": 1}))
 
 
+def get_user_by_id(user_id):
+    return _out(_db().users.find_one({"_id": _oid(user_id)}))
+
+
 def list_users():
     return [_out(u) for u in _db().users.find().sort("username", 1)]
 
 
 def create_user(username, pw_hash, role="viewer", full_name=""):
-    _db().users.insert_one({
-        "username": username.strip(), "pw_hash": pw_hash,
-        "full_name": full_name.strip(), "role": role, "active": 1,
-        "created_at": _now(),
-    })
+    _db().users.insert_one(
+        {
+            "username": username.strip(),
+            "pw_hash": pw_hash,
+            "full_name": full_name.strip(),
+            "role": role,
+            "active": 1,
+            "created_at": _now(),
+        }
+    )
 
 
 def update_user(user_id, **fields):
@@ -141,14 +173,18 @@ def delete_user(user_id):
 
 # ---------- staff ----------
 
+
 def list_staff(active_only=False):
     q = {"active": 1} if active_only else {}
     return [_out(s) for s in _db().staff.find(q).sort("form_name", 1)]
 
 
 def upsert_staff(form_name, full_name="", active=1, staff_id=None):
-    doc = {"form_name": form_name.strip(), "full_name": full_name.strip(),
-           "active": int(active)}
+    doc = {
+        "form_name": form_name.strip(),
+        "full_name": full_name.strip(),
+        "active": int(active),
+    }
     if staff_id:
         _db().staff.update_one({"_id": _oid(staff_id)}, {"$set": doc})
     else:
@@ -161,18 +197,31 @@ def delete_staff(staff_id):
 
 # ---------- teams ----------
 
+
 def list_teams(active_only=False):
     q = {"active": 1} if active_only else {}
-    return [_out(t) for t in
-            _db().teams.find(q).sort([("sort_order", 1), ("name", 1)])]
+    return [_out(t) for t in _db().teams.find(q).sort([("sort_order", 1), ("name", 1)])]
 
 
-def upsert_team(name, reports_as_section, min_size, max_size, pinned_members,
-                active=1, sort_order=0, team_id=None):
-    doc = {"name": name.strip(), "reports_as_section": reports_as_section,
-           "min_size": int(min_size), "max_size": int(max_size),
-           "pinned_members": list(pinned_members or []),
-           "active": int(active), "sort_order": int(sort_order)}
+def upsert_team(
+    name,
+    reports_as_section,
+    min_size,
+    max_size,
+    pinned_members,
+    active=1,
+    sort_order=0,
+    team_id=None,
+):
+    doc = {
+        "name": name.strip(),
+        "reports_as_section": reports_as_section,
+        "min_size": int(min_size),
+        "max_size": int(max_size),
+        "pinned_members": list(pinned_members or []),
+        "active": int(active),
+        "sort_order": int(sort_order),
+    }
     if team_id:
         _db().teams.update_one({"_id": _oid(team_id)}, {"$set": doc})
     else:
@@ -187,25 +236,29 @@ def delete_team(team_id):
 
 # ---------- schedules (assignments embedded in the schedule document) ----------
 
+
 def save_schedule(week_start, week_end, assignments, created_by=""):
     """assignments: list of (team_id, staff_name, position). Replaces any
     existing schedule for the same week."""
     _db().schedules.update_one(
         {"week_start": week_start},
-        {"$set": {
-            "week_end": week_end, "created_by": created_by,
-            "created_at": _now(),
-            "assignments": [
-                {"team_id": str(tid), "staff_name": name, "position": pos}
-                for tid, name, pos in assignments],
-        }},
+        {
+            "$set": {
+                "week_end": week_end,
+                "created_by": created_by,
+                "created_at": _now(),
+                "assignments": [
+                    {"team_id": str(tid), "staff_name": name, "position": pos}
+                    for tid, name, pos in assignments
+                ],
+            }
+        },
         upsert=True,
     )
 
 
 def list_schedules(limit=30):
-    return [_out(s) for s in
-            _db().schedules.find().sort("week_start", -1).limit(limit)]
+    return [_out(s) for s in _db().schedules.find().sort("week_start", -1).limit(limit)]
 
 
 def get_schedule(week_start):
@@ -214,9 +267,13 @@ def get_schedule(week_start):
         return None
     teams = {t["id"]: t for t in list_teams()}
     assignments = []
-    for a in sorted(doc.get("assignments", []),
-                    key=lambda a: (teams.get(a["team_id"], {}).get("sort_order", 99),
-                                   a.get("position", 0))):
+    for a in sorted(
+        doc.get("assignments", []),
+        key=lambda a: (
+            teams.get(a["team_id"], {}).get("sort_order", 99),
+            a.get("position", 0),
+        ),
+    ):
         t = teams.get(a["team_id"])
         assignments.append({**a, "team_name": t["name"] if t else "(deleted team)"})
     return {"schedule": _out(doc), "assignments": assignments}
@@ -231,8 +288,13 @@ def assignment_history():
     out = []
     for s in _db().schedules.find().sort("week_start", -1):
         for a in s.get("assignments", []):
-            out.append({"week_start": s["week_start"], "team_id": a["team_id"],
-                        "staff_name": a["staff_name"]})
+            out.append(
+                {
+                    "week_start": s["week_start"],
+                    "team_id": a["team_id"],
+                    "staff_name": a["staff_name"],
+                }
+            )
     return out
 
 
