@@ -1,3 +1,5 @@
+from datetime import date
+
 import pandas as pd
 
 from nrb.domain import reporting_analytics
@@ -102,25 +104,90 @@ def test_section_and_compliance_analytics_preserve_reporting_rules():
     assert len(detail) == 2
 
 
-def test_scheduled_reporting_comparison_marks_unreported_and_extra_people():
+def test_daily_reporting_compliance_enforces_each_weekday():
     clean = pd.DataFrame(
         {
-            "date": pd.to_datetime(["2026-10-06", "2026-10-06"]),
-            "names_list": [["Alice"], ["Bob"]],
+            "date": pd.to_datetime(
+                ["2026-10-05", "2026-10-06", "2026-10-06", "2026-10-10"]
+            ),
+            "section": ["ID CAPTURING", "ID DISTRIBUTION", "ID CAPTURING", "OTHER"],
+            "names_list": [["Alice", "Cara"], ["Alice"], ["Bob"], ["Cara"]],
         }
     )
-    schedule = {
-        "schedule": {"week_start": "2026-10-05"},
-        "assignments": [
-            {"team_name": "Capturing", "staff_name": "Alice"},
-            {"team_name": "Distribution", "staff_name": "Cara"},
-        ],
-    }
-
-    rows, extras = reporting_analytics.scheduled_reporting_comparison(clean, schedule)
-
-    assert rows == [
-        {"Team": "Capturing", "Staff": "Alice", "Reported this week": "✅"},
-        {"Team": "Distribution", "Staff": "Cara", "Reported this week": "❌"},
+    assignments = [
+        {
+            "team_name": "Capturing",
+            "staff_name": "Alice",
+            "reports_as_section": "ID CAPTURING",
+        },
+        {
+            "team_name": "Distribution",
+            "staff_name": "Cara",
+            "reports_as_section": "ID DISTRIBUTION",
+        },
     ]
-    assert extras == ["Bob"]
+
+    week = reporting_analytics.daily_reporting_compliance(
+        clean, date(2026, 10, 5), assignments, today=date(2026, 10, 7)
+    )
+
+    grid = week.grid.set_index("Staff")
+    assert grid.loc["Alice", "Mon 05 Oct"] == "✅"
+    assert grid.loc["Alice", "Tue 06 Oct"] == "⚠️"
+    assert grid.loc["Alice", "Wed 07 Oct"] == "❌"
+    assert grid.loc["Alice", "Thu 08 Oct"] == "·"
+    assert grid.loc["Cara", "Mon 05 Oct"] == "⚠️"
+    assert grid.loc["Cara", "Tue 06 Oct"] == "❌"
+    assert grid.loc["Cara", "Sat 10 Oct"] == "⚠️"
+    assert grid.loc["Alice", "Missed days"] == 1
+    assert grid.loc["Cara", "Missed days"] == 2
+
+    monday, tuesday, wednesday, thursday, _, saturday, _ = week.days
+    assert (monday.expected, monday.reported) == (2, 2)
+    assert (tuesday.expected, tuesday.reported, tuesday.unscheduled) == (
+        2,
+        1,
+        ["Bob"],
+    )
+    assert (wednesday.enforced, wednesday.reported) == (True, 0)
+    assert (thursday.enforced, thursday.expected) == (False, 0)
+    assert (saturday.enforced, saturday.reported) == (False, 1)
+
+
+def test_daily_reporting_compliance_accepts_any_section_without_team():
+    clean = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-10-05"]),
+            "section": ["ID CAPTURING"],
+            "names_list": [["Alice"]],
+        }
+    )
+
+    week = reporting_analytics.daily_reporting_compliance(
+        clean,
+        date(2026, 10, 5),
+        [{"team_name": "—", "staff_name": "Alice"}],
+        today=date(2026, 10, 11),
+    )
+
+    row = week.grid.iloc[0]
+    assert row["Mon 05 Oct"] == "✅"
+    assert row["Sun 11 Oct"] == ""
+    assert row["Missed days"] == 4
+
+
+def test_day_reports_lists_each_person_and_section():
+    clean = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-10-05", "2026-10-06"]),
+            "section": ["ID CAPTURING", "ID CAPTURING"],
+            "Name": ["Bob, Alice", "Cara"],
+            "names_list": [["Bob", "Alice"], ["Cara"]],
+        }
+    )
+
+    reports = reporting_analytics.day_reports(clean, date(2026, 10, 5))
+
+    assert reports["Person"].tolist() == ["Alice", "Bob"]
+    assert set(reports["Submitted as"]) == {"Bob, Alice"}
+    assert reporting_analytics.day_reports(clean, date(2026, 10, 7)).empty

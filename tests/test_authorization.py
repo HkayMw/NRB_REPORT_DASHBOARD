@@ -51,3 +51,33 @@ def test_admin_check_returns_current_principal():
     authorization = AuthorizationService(FakePrincipalRepository(current))
 
     assert authorization.require_admin({"id": "user-1", "role": "viewer"}) is current
+
+
+@pytest.mark.parametrize(
+    "role,permission,allowed",
+    [
+        ("admin", "edit_schedule", True),
+        ("clerk", "create_schedule", True),
+        ("clerk", "manage_roster", True),
+        ("clerk", "edit_schedule", False),
+        ("viewer", "create_schedule", False),
+    ],
+)
+def test_require_permission_uses_persisted_role(role, permission, allowed):
+    current = {"id": "user-1", "role": role, "active": 1}
+    authorization = AuthorizationService(FakePrincipalRepository(current))
+
+    if allowed:
+        assert authorization.require({"id": "user-1"}, permission) is current
+    else:
+        with pytest.raises(PermissionError):
+            authorization.require({"id": "user-1", "role": "admin"}, permission)
+
+
+def test_clerk_is_not_admin():
+    authorization = AuthorizationService(
+        FakePrincipalRepository({"id": "user-1", "role": "clerk", "active": 1})
+    )
+
+    with pytest.raises(PermissionError):
+        authorization.require_admin({"id": "user-1"})

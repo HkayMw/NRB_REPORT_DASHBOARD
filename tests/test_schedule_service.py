@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from nrb.application.services.authorization import AuthorizationService
@@ -35,6 +37,12 @@ class FakeScheduleRepository:
                 "id": "admin-id",
                 "username": "admin",
                 "role": "admin",
+                "active": 1,
+            },
+            "clerk": {
+                "id": "clerk",
+                "username": "clerk",
+                "role": "clerk",
                 "active": 1,
             },
             "viewer": {
@@ -231,3 +239,69 @@ def test_admin_can_upsert_team_and_delete_schedule():
         )
     ]
     assert repository.deleted_schedules == ["2026-10-05"]
+
+
+def test_schedule_for_week_finds_schedule_from_any_day_in_week():
+    repository = FakeScheduleRepository()
+    repository.schedules = [{"schedule": {"week_start": "2026-10-05"}}]
+    service = ScheduleService(repository, AuthorizationService(repository))
+
+    assert service.schedule_for_week(date(2026, 10, 8)) is repository.schedules[0]
+    assert service.schedule_for_week(date(2026, 10, 12)) is None
+
+
+def test_clerk_can_create_but_not_replace_or_delete_schedule():
+    repository = FakeScheduleRepository()
+    service = ScheduleService(repository, AuthorizationService(repository))
+    clerk = {"id": "clerk", "username": "clerk", "role": "clerk"}
+    assignments = [("team-1", "Alice", 0)]
+
+    service.save_schedule("2026-10-05", "2026-10-09", assignments, ["Alice"], clerk)
+    repository.schedules = [{"schedule": {"week_start": "2026-10-05"}}]
+
+    with pytest.raises(PermissionError, match="already exists"):
+        service.save_schedule("2026-10-05", "2026-10-09", assignments, ["Alice"], clerk)
+    with pytest.raises(PermissionError):
+        service.delete_schedule("2026-10-05", clerk)
+    with pytest.raises(PermissionError):
+        service.delete_team("team-1", clerk)
+
+    assert repository.saved == [("2026-10-05", "2026-10-09", assignments, "clerk")]
+    assert repository.deleted_schedules == []
+
+
+def test_admin_can_replace_existing_schedule():
+    repository = FakeScheduleRepository()
+    repository.schedules = [{"schedule": {"week_start": "2026-10-05"}}]
+    service = ScheduleService(repository, AuthorizationService(repository))
+
+    service.save_schedule(
+        "2026-10-05",
+        "2026-10-09",
+        [("team-1", "Alice", 0)],
+        ["Alice"],
+        {"id": "admin", "username": "admin"},
+    )
+
+    assert len(repository.saved) == 1
+
+
+def test_carry_packages_drafts_from_saved_week_without_saving():
+    repository = FakeScheduleRepository()
+    repository.schedules = [
+        {
+            "schedule": {"week_start": "2026-10-05"},
+            "assignments": [{"team_id": "team-1", "staff_name": "Alice"}],
+        }
+    ]
+    service = ScheduleService(repository, AuthorizationService(repository))
+    teams = [dict(repository.teams[0], max_size=2)]
+
+    result = service.carry_packages(
+        "2026-10-05", {"team-1": "team-1"}, ["Alice"], teams
+    )
+
+    assert result["assignment"] == {"team-1": ["Alice"]}
+    assert repository.saved == []
+    with pytest.raises(ValueError, match="no longer available"):
+        service.carry_packages("2026-09-28", {}, ["Alice"], teams)

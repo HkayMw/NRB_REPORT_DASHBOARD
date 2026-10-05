@@ -275,7 +275,13 @@ def get_schedule(week_start):
         ),
     ):
         t = teams.get(a["team_id"])
-        assignments.append({**a, "team_name": t["name"] if t else "(deleted team)"})
+        assignments.append(
+            {
+                **a,
+                "team_name": t["name"] if t else "(deleted team)",
+                "reports_as_section": t["reports_as_section"] if t else None,
+            }
+        )
     return {"schedule": _out(doc), "assignments": assignments}
 
 

@@ -4,6 +4,7 @@ import streamlit as st
 
 from nrb.application.errors import ApplicationError, log_unexpected
 from nrb.application.services.authentication import AuthenticationService
+from nrb.domain import roles
 
 
 def current_user():
@@ -12,7 +13,13 @@ def current_user():
 
 def is_admin():
     u = current_user()
-    return bool(u and u["role"] == "admin")
+    return bool(u and u["role"] == roles.ADMIN)
+
+
+def can(permission: str) -> bool:
+    """UI hint only — services re-check against the persisted account."""
+    u = current_user()
+    return bool(u and roles.has_permission(u["role"], permission))
 
 
 def is_logged_in():

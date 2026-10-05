@@ -16,6 +16,7 @@ from nrb.application.services.database_backup import (
 from nrb.application.services.report_configuration import ReportConfigService
 from nrb.application.services.user_management import UserManagementService
 from nrb.domain import report_config as reportcfg
+from nrb.domain import roles
 
 
 def render(
@@ -28,7 +29,11 @@ def render(
         "⚙️", "Administration", "Data source, roster, report layout, users, database"
     )
     if not auth.is_admin():
-        st.warning("Administrators only — log in from the sidebar.")
+        if auth.can(roles.MANAGE_ROSTER):
+            st.caption("Clerks can keep the staff roster up to date here.")
+            _roster_tab(admin_settings_service, auth.current_user())
+        else:
+            st.warning("Administrators only — log in from the sidebar.")
         return
     tab_src, tab_roster, tab_layout, tab_users, tab_db = st.tabs(
         ["Data source", "Roster", "Report layout", "Users", "Database"]
@@ -189,7 +194,7 @@ def _users_tab(user_management_service: UserManagementService, actor: dict | Non
         full_name = c2.text_input("Full name")
         c3, c4 = st.columns(2)
         password = c3.text_input("Password", type="password")
-        role = c4.selectbox("Role", ["viewer", "admin"])
+        role = c4.selectbox("Role", roles.ROLES)
         if st.form_submit_button("Create user"):
             try:
                 user_management_service.create_user(
@@ -213,8 +218,8 @@ def _users_tab(user_management_service: UserManagementService, actor: dict | Non
     )
     new_role = c2.selectbox(
         "Role",
-        ["viewer", "admin"],
-        index=0 if user["role"] == "viewer" else 1,
+        roles.ROLES,
+        index=roles.ROLES.index(user["role"]) if user["role"] in roles.ROLES else 0,
         key="edit_role",
     )
     new_active = c3.checkbox("Active", bool(user["active"]), key="edit_active")

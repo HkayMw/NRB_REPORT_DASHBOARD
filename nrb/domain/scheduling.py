@@ -138,6 +138,78 @@ def generate_schedule(available: list, teams: list, history: list) -> dict:
     return {"assignment": assignment, "unplaced": pool}
 
 
+def carry_packages(
+    source_assignments: list[dict],
+    moves: dict[str, str],
+    available: list[str],
+    teams: list[dict],
+) -> dict:
+    """Draft a week by moving whole team packages from a saved week.
+
+    A package is the people who shared a team in `source_assignments`.
+    `moves` maps a source team_id to the target team_id it moves to; source
+    teams left out are not carried. Pinned members always go to their own
+    team instead of moving. Away people leave a gap, and people beyond a
+    target team's max_size are left unplaced — both for manual fixing.
+
+    Returns {"assignment": {team_id: [names]}, "unplaced": [names],
+    "notes": [str]} where `unplaced` is everyone available but not placed.
+    """
+    teams_by_id = {str(team["id"]): team for team in teams}
+    assignment: dict[str, list[str]] = {team_id: [] for team_id in teams_by_id}
+    available_set = set(available)
+    placed: set[str] = set()
+    notes: list[str] = []
+
+    pinned_team = {}
+    for team in teams:
+        for name in team["pinned_members"]:
+            pinned_team[name] = str(team["id"])
+            if name in available_set and name not in placed:
+                assignment[str(team["id"])].append(name)
+                placed.add(name)
+
+    packages: dict[str, list[str]] = {}
+    for a in sorted(source_assignments, key=lambda a: a.get("position", 0)):
+        packages.setdefault(str(a["team_id"]), []).append(a["staff_name"])
+
+    for source_id, members in packages.items():
+        target_id = moves.get(source_id)
+        if target_id not in teams_by_id:
+            continue
+        target = teams_by_id[target_id]
+        for name in members:
+            if name in pinned_team:
+                if pinned_team[name] != target_id and name in available_set:
+                    pinned_name = teams_by_id[pinned_team[name]]["name"]
+                    notes.append(f"{name} stayed on {pinned_name} (pinned).")
+                continue
+            if name not in available_set:
+                notes.append(f"{name} is away — gap left on {target['name']}.")
+                continue
+            if name in placed:
+                continue
+            if len(assignment[target_id]) >= target["max_size"]:
+                notes.append(
+                    f"{name} not placed — {target['name']} is full "
+                    f"(max {target['max_size']})."
+                )
+                continue
+            assignment[target_id].append(name)
+            placed.add(name)
+
+    for team_id, team in teams_by_id.items():
+        short = team["min_size"] - len(assignment[team_id])
+        if short > 0:
+            notes.append(
+                f"{team['name']} needs {short} more "
+                f"(min {team['min_size']}) — add someone manually."
+            )
+
+    unplaced = [name for name in dict.fromkeys(available) if name not in placed]
+    return {"assignment": assignment, "unplaced": unplaced, "notes": notes}
+
+
 def whatsapp_text(
     week_start: date, assignments_by_team: list, roster_full_names: dict
 ) -> str:

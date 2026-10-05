@@ -120,7 +120,7 @@ def test_roster_rejects_duplicates_before_writing():
     assert repository.writes == []
 
 
-def test_roster_mutation_requires_admin():
+def test_roster_mutation_rejects_viewer():
     repository = FakeAdminSettingsRepository()
     service = make_service(repository)
 
@@ -144,3 +144,20 @@ def test_stale_admin_session_is_rejected_after_demotion():
         service.set_public_viewing(False, {"id": "admin-id", "role": "admin"})
 
     assert repository.writes == []
+
+
+def test_clerk_can_save_roster_but_not_change_data_source():
+    repository = FakeAdminSettingsRepository()
+    repository.principals["clerk-id"] = {"id": "clerk-id", "role": "clerk", "active": 1}
+    service = make_service(repository)
+    clerk = {"id": "clerk-id", "role": "clerk"}
+
+    service.save_roster(
+        [{"Form name": "Alice", "Full name": "A", "Active": True}], clerk
+    )
+    with pytest.raises(PermissionError):
+        service.set_public_viewing(False, clerk)
+    with pytest.raises(PermissionError):
+        service.test_and_save_sheet_url("https://example.com", clerk)
+
+    assert repository.writes == [("upsert", "Alice", "A", True, "1")]

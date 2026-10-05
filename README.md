@@ -25,9 +25,14 @@ month days only), the workbook is values-only and already named
 - **Scheduling** — manage teams (CRUD, min/max size, pinned members, which form
   section each team reports as), generate a fair rotation (longest-away-first,
   balanced totals), tweak manually, save, and copy the WhatsApp message.
-- **Real auth** — per-user accounts (PBKDF2-hashed passwords, admin/viewer
-  roles) stored in MongoDB Atlas. Dashboards can be public or login-only
-  (Admin toggle); export, scheduling and admin always require login.
+- **Real auth** — per-user accounts (PBKDF2-hashed passwords) stored in
+  MongoDB Atlas. Dashboards can be public or login-only (Admin toggle);
+  export, scheduling and admin always require login. Roles
+  (`nrb/domain/roles.py`):
+  - **viewer** — dashboards and report download.
+  - **clerk** — plus creating new weekly schedules and editing the roster.
+  - **admin** — everything, including editing/deleting saved schedules,
+    teams, users, data source, report layout and the database.
 - **Persistent storage** — users, teams, schedules and settings live in
   MongoDB Atlas, so nothing is lost on app restarts or redeploys. Form
   responses stay in Google Sheets as before.

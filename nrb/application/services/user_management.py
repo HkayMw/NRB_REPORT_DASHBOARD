@@ -5,6 +5,7 @@ from typing import Callable, Protocol
 
 from nrb.application.errors import call_infrastructure
 from nrb.application.services.authorization import AuthorizationService
+from nrb.domain import roles
 
 
 class UserRepository(Protocol):
@@ -52,8 +53,8 @@ class UserManagementService:
             raise ValueError(
                 "Username required; password must be at least 8 characters."
             )
-        if role not in {"viewer", "admin"}:
-            raise ValueError("Role must be viewer or admin.")
+        if role not in roles.ROLES:
+            raise ValueError("Role must be viewer, clerk or admin.")
         if call_infrastructure(
             "Check username availability",
             "Could not check username availability. Please try again later.",
@@ -80,9 +81,9 @@ class UserManagementService:
         actor: dict | None,
     ) -> None:
         principal = self.authorization.require_admin(actor)
-        if role not in {"viewer", "admin"}:
-            raise ValueError("Role must be viewer or admin.")
-        if principal["id"] == user_id and (role != "admin" or not active):
+        if role not in roles.ROLES:
+            raise ValueError("Role must be viewer, clerk or admin.")
+        if principal["id"] == user_id and (role != roles.ADMIN or not active):
             raise ValueError("You cannot demote or deactivate your own account.")
 
         fields = {"role": role, "active": int(active)}

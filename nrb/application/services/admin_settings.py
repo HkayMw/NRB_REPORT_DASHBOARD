@@ -8,6 +8,7 @@ import pandas as pd
 from nrb import config
 from nrb.application.errors import application_error, call_infrastructure
 from nrb.application.services.authorization import AuthorizationService
+from nrb.domain import roles
 
 
 class AdminSettingsRepository(Protocol):
@@ -100,7 +101,7 @@ class AdminSettingsService:
         )
 
     def save_roster(self, rows: list[dict], actor: dict | None) -> None:
-        self._require_admin(actor)
+        self.authorization.require(actor, roles.MANAGE_ROSTER)
         names = [
             str(row.get("Form name", "")).strip()
             for row in rows

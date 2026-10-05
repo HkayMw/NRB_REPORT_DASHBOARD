@@ -24,6 +24,7 @@ from nrb.infrastructure.repositories.users import MongoUserRepository
 from nrb.infrastructure.repositories import mongo as db
 from nrb.infrastructure.exporters import excel as export
 from nrb.infrastructure.data_sources import google_sheets as sheets
+from nrb.domain import roles
 from nrb.domain.passwords import hash_password, verify_password
 from nrb.views import admin, compliance, monthly, overview, quality, schedule
 
@@ -152,14 +153,18 @@ if can_view:
 else:
     nav[""] = [st.Page(_login_required, title="Home", icon="🏠", default=True)]
 
-if auth.is_admin():
-    nav["Manage"] = [
+manage = []
+if auth.can(roles.CREATE_SCHEDULE):
+    manage.append(
         st.Page(
             lambda: schedule.render(schedule_service),
             title="Scheduling",
             icon="🗓️",
             url_path="scheduling",
-        ),
+        )
+    )
+if auth.is_admin() or auth.can(roles.MANAGE_ROSTER):
+    manage.append(
         st.Page(
             lambda: admin.render(
                 report_config_service,
@@ -170,7 +175,9 @@ if auth.is_admin():
             title="Admin",
             icon="⚙️",
             url_path="admin",
-        ),
-    ]
+        )
+    )
+if manage:
+    nav["Manage"] = manage
 
 st.navigation(nav).run()

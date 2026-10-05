@@ -1,7 +1,7 @@
 """Reporting calculations shared by Streamlit pages."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -209,25 +209,110 @@ def compliance_person_detail(people: pd.DataFrame, person: str) -> pd.DataFrame:
     return detail.sort_values("date", ascending=False)
 
 
-def scheduled_reporting_comparison(
-    clean: pd.DataFrame, schedule: dict
-) -> tuple[list[dict], list[str]]:
-    week_start = pd.Timestamp(schedule["schedule"]["week_start"])
-    week_end = week_start + pd.Timedelta(days=6)
+REPORTED = "✅"
+OTHER_SECTION = "⚠️"
+MISSING = "❌"
+PENDING = "·"
+NOT_REQUIRED = ""
+
+
+@dataclass(frozen=True)
+class DailyComplianceDay:
+    day: date
+    enforced: bool  # weekday that has already started
+    expected: int  # scheduled people who had to report (0 when not enforced)
+    reported: int  # scheduled people named on any submission that day
+    unscheduled: list[str]  # reported but not on the schedule
+
+
+@dataclass(frozen=True)
+class DailyComplianceWeek:
+    week_start: date
+    days: list[DailyComplianceDay]
+    grid: pd.DataFrame
+
+
+def day_column(day: date) -> str:
+    return day.strftime("%a %d %b")
+
+
+def daily_reporting_compliance(
+    clean: pd.DataFrame, week_start: date, assignments: list[dict], today: date
+) -> DailyComplianceWeek:
+    """Per-person, per-day reporting status for one Mon–Sun week.
+
+    A person has reported on a day when their name is on a submission for that
+    date. Reporting for a section other than their team's `reports_as_section`
+    is a soft warning; a missing `reports_as_section` accepts any section.
+    Weekdays up to `today` are enforced; weekends are shown but never missing.
+    """
+    days = [week_start + timedelta(days=offset) for offset in range(7)]
     week_people = cleaning.explode_people(
-        clean[(clean["date"] >= week_start) & (clean["date"] <= week_end)]
+        clean[
+            (clean["date"] >= pd.Timestamp(days[0]))
+            & (clean["date"] <= pd.Timestamp(days[-1]))
+        ]
     )
-    reported = set(week_people["person"]) if not week_people.empty else set()
-    assignments = schedule["assignments"]
-    rows = [
-        {
-            "Team": assignment["team_name"],
-            "Staff": assignment["staff_name"],
-            "Reported this week": "✅"
-            if assignment["staff_name"] in reported
-            else "❌",
-        }
-        for assignment in assignments
-    ]
-    extras = sorted(reported - {assignment["staff_name"] for assignment in assignments})
-    return rows, extras
+    sections_by_person_day: dict[tuple[str, date], set[str]] = {}
+    for row in week_people.itertuples(index=False):
+        key = (row.person, row.date.date())
+        sections_by_person_day.setdefault(key, set()).add(row.section)
+
+    scheduled = {assignment["staff_name"] for assignment in assignments}
+    rows = []
+    for assignment in assignments:
+        expected_section = assignment.get("reports_as_section")
+        row = {"Team": assignment["team_name"], "Staff": assignment["staff_name"]}
+        missed = 0
+        for day in days:
+            sections = sections_by_person_day.get((assignment["staff_name"], day))
+            if sections:
+                ok = expected_section is None or expected_section in sections
+                status = REPORTED if ok else OTHER_SECTION
+            elif day > today:
+                status = PENDING
+            elif day.weekday() >= 5:
+                status = NOT_REQUIRED
+            else:
+                status = MISSING
+                missed += 1
+            row[day_column(day)] = status
+        row["Missed days"] = missed
+        rows.append(row)
+    grid = pd.DataFrame(
+        rows, columns=["Team", "Staff", *map(day_column, days), "Missed days"]
+    )
+
+    summary = []
+    for day in days:
+        reporters = {person for person, d in sections_by_person_day if d == day}
+        enforced = day.weekday() < 5 and day <= today
+        summary.append(
+            DailyComplianceDay(
+                day=day,
+                enforced=enforced,
+                expected=len(scheduled) if enforced else 0,
+                reported=len(reporters & scheduled),
+                unscheduled=sorted(reporters - scheduled),
+            )
+        )
+    return DailyComplianceWeek(week_start=week_start, days=summary, grid=grid)
+
+
+def day_reports(clean: pd.DataFrame, day: date) -> pd.DataFrame:
+    """Who reported which section on one day, one row per person."""
+    people = cleaning.explode_people(clean[clean["date"] == pd.Timestamp(day)])
+    if people.empty:
+        return pd.DataFrame(columns=["Person", "Section", "Submitted as"])
+    return (
+        people[["person", "section", config.NAME_COL]]
+        .rename(
+            columns={
+                "person": "Person",
+                "section": "Section",
+                config.NAME_COL: "Submitted as",
+            }
+        )
+        .sort_values(["Person", "Section"])
+        .reset_index(drop=True)
+    )

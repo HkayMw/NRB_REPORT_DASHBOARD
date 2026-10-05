@@ -1,6 +1,10 @@
 import pytest
 
-from nrb.domain.scheduling import generate_schedule, validate_schedule
+from nrb.domain.scheduling import (
+    carry_packages,
+    generate_schedule,
+    validate_schedule,
+)
 
 
 def _validate(
@@ -124,3 +128,80 @@ def test_validate_schedule_enforces_capacity_and_pinned_assignment():
         )
     with pytest.raises(ValueError, match="pinned member 'Alice'"):
         _validate([("team-1", "Bob", 0), ("team-1", "Cara", 1)], teams=[team])
+
+
+def package_teams():
+    return [
+        {
+            "id": "cap",
+            "name": "Capturing",
+            "min_size": 2,
+            "max_size": 3,
+            "pinned_members": ["Pia"],
+        },
+        {
+            "id": "dist",
+            "name": "Distribution",
+            "min_size": 2,
+            "max_size": 2,
+            "pinned_members": [],
+        },
+    ]
+
+
+def test_carry_packages_swaps_teams_keeping_people_together():
+    source = [
+        {"team_id": "cap", "staff_name": "Pia", "position": 0},
+        {"team_id": "cap", "staff_name": "Ann", "position": 1},
+        {"team_id": "cap", "staff_name": "Ben", "position": 2},
+        {"team_id": "dist", "staff_name": "Cy", "position": 0},
+        {"team_id": "dist", "staff_name": "Di", "position": 1},
+    ]
+
+    result = carry_packages(
+        source,
+        {"cap": "dist", "dist": "cap"},
+        ["Pia", "Ann", "Ben", "Cy", "Di"],
+        package_teams(),
+    )
+
+    assert result["assignment"] == {"cap": ["Pia", "Cy", "Di"], "dist": ["Ann", "Ben"]}
+    assert result["unplaced"] == []
+    assert result["notes"] == ["Pia stayed on Capturing (pinned)."]
+
+
+def test_carry_packages_leaves_gaps_and_unplaced_overflow():
+    source = [
+        {"team_id": "cap", "staff_name": "Ann", "position": 0},
+        {"team_id": "cap", "staff_name": "Ben", "position": 1},
+        {"team_id": "cap", "staff_name": "Eve", "position": 2},
+        {"team_id": "dist", "staff_name": "Cy", "position": 0},
+        {"team_id": "dist", "staff_name": "Di", "position": 1},
+    ]
+
+    result = carry_packages(
+        source,
+        {"cap": "dist", "dist": "cap"},
+        ["Ann", "Ben", "Eve", "Cy", "Fay"],  # Di away, Fay not carried
+        package_teams(),
+    )
+
+    assert result["assignment"] == {"cap": ["Cy"], "dist": ["Ann", "Ben"]}
+    assert result["unplaced"] == ["Eve", "Fay"]
+    assert "Eve not placed — Distribution is full (max 2)." in result["notes"]
+    assert "Di is away — gap left on Capturing." in result["notes"]
+    assert "Capturing needs 1 more (min 2) — add someone manually." in result["notes"]
+
+
+def test_carry_packages_skips_uncarried_and_inactive_targets():
+    source = [
+        {"team_id": "cap", "staff_name": "Ann", "position": 0},
+        {"team_id": "old", "staff_name": "Ben", "position": 0},
+    ]
+
+    result = carry_packages(
+        source, {"old": "gone"}, ["Ann", "Ben", "Pia"], package_teams()
+    )
+
+    assert result["assignment"] == {"cap": ["Pia"], "dist": []}
+    assert result["unplaced"] == ["Ann", "Ben"]

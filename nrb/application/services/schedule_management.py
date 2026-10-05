@@ -1,9 +1,10 @@
 """Use cases for generating and saving weekly team schedules."""
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Protocol
 
-from nrb.domain import scheduling
+from nrb.domain import roles, scheduling, weeks
 from nrb.application.errors import call_infrastructure
 from nrb.application.services.authorization import AuthorizationService
 
@@ -128,8 +129,13 @@ class ScheduleService:
             week_start,
         )
 
+    def schedule_for_week(self, day: date) -> dict | None:
+        """The saved schedule for the Mon–Fri week containing `day`, if any."""
+        monday, _ = weeks.work_week_of(day)
+        return self.get_schedule(monday.isoformat())
+
     def delete_schedule(self, week_start: str, actor: dict | None) -> None:
-        self._require_admin(actor)
+        self.authorization.require(actor, roles.EDIT_SCHEDULE)
         call_infrastructure(
             "Delete schedule",
             "Could not delete the schedule. Please try again later.",
@@ -141,6 +147,19 @@ class ScheduleService:
         history = self.assignment_history()
         return scheduling.generate_schedule(available, teams, history)
 
+    def carry_packages(
+        self,
+        source_week_start: str,
+        moves: dict[str, str],
+        available: list[str],
+        teams: list[dict],
+    ) -> dict:
+        """Draft (not saved) from moving a saved week's team packages."""
+        source = self.get_schedule(source_week_start)
+        if source is None:
+            raise ValueError("That saved week is no longer available.")
+        return scheduling.carry_packages(source["assignments"], moves, available, teams)
+
     def save_schedule(
         self,
         week_start: str,
@@ -149,7 +168,15 @@ class ScheduleService:
         available_staff: list[str],
         actor: dict | None,
     ) -> None:
-        principal = self.authorization.require_admin(actor)
+        """Create the week's schedule, or replace it when allowed to edit."""
+        principal = self.authorization.require(actor, roles.CREATE_SCHEDULE)
+        if not roles.has_permission(
+            principal.get("role"), roles.EDIT_SCHEDULE
+        ) and self.get_schedule(week_start):
+            raise PermissionError(
+                "A schedule already exists for this week. Only administrators "
+                "can change it."
+            )
         active_teams = self.list_teams(active_only=True)
         active_staff = self.list_staff(active_only=True)
         scheduling.validate_schedule(

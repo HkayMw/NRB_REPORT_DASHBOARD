@@ -30,6 +30,7 @@ def test_mongo_repository_round_trips_user_and_schedule(monkeypatch):
             "staff_name": "Alice",
             "position": 0,
             "team_name": team["name"],
+            "reports_as_section": team["reports_as_section"],
         }
     ]
     assert schedules.assignment_history() == [

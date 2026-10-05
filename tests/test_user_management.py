@@ -11,6 +11,7 @@ class FakeUserRepository:
         self.principals = {
             "admin-id": {"id": "admin-id", "role": "admin", "active": 1},
             "viewer-id": {"id": "viewer-id", "role": "viewer", "active": 1},
+            "clerk-id": {"id": "clerk-id", "role": "clerk", "active": 1},
         }
 
     def get_user_by_id(self, user_id):
@@ -125,3 +126,16 @@ def test_admin_can_update_other_user_and_optional_password():
             },
         )
     ]
+
+
+def test_admin_can_create_clerk_but_clerk_cannot_create_users():
+    repository = FakeUserRepository()
+    service = make_service(repository)
+
+    service.create_user("clerk", "Clerk", "long-password", "clerk", {"id": "admin-id"})
+    with pytest.raises(PermissionError):
+        service.create_user("x", "X", "long-password", "viewer", {"id": "clerk-id"})
+    with pytest.raises(ValueError, match="Role must be"):
+        service.create_user("y", "Y", "long-password", "owner", {"id": "admin-id"})
+
+    assert [write[3] for write in repository.writes] == ["clerk"]
