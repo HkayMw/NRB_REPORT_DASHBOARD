@@ -81,8 +81,10 @@ def validate_schedule(
                 f"and {team['max_size']} members."
             )
         for pinned_name in team.get("pinned_members", []):
-            if (pinned_name in available_names
-                    and assigned_team_by_staff.get(pinned_name) != team_id):
+            if (
+                pinned_name in available_names
+                and assigned_team_by_staff.get(pinned_name) != team_id
+            ):
                 raise ValueError(
                     f"Available pinned member '{pinned_name}' must be assigned "
                     f"to team '{team['name']}'."
@@ -93,7 +95,7 @@ def generate_schedule(available: list, teams: list, history: list) -> dict:
     """Returns {team_id: [staff_name, ...]}. `available` = staff form_names
     on duty this week; `teams` and `history` are supplied by the caller."""
     last_on_team, totals = _recency_maps(history)
-    NEVER = 10 ** 6
+    NEVER = 10**6
 
     assignment = {t["id"]: [] for t in teams}
     pool = list(dict.fromkeys(available))
@@ -109,6 +111,7 @@ def generate_schedule(available: list, teams: list, history: list) -> dict:
         def score(name):
             ago = last_on_team.get((team["id"], name), NEVER)
             return (-ago, totals.get(name, 0), name)  # longest-ago first
+
         return sorted(pool, key=score)[0]
 
     # 2. Fill every team to min_size, most-constrained teams first.
@@ -123,7 +126,9 @@ def generate_schedule(available: list, teams: list, history: list) -> dict:
         open_teams = [t for t in teams if len(assignment[t["id"]]) < t["max_size"]]
         if not open_teams:
             break
-        t = sorted(open_teams, key=lambda t: (len(assignment[t["id"]]), t["sort_order"]))[0]
+        t = sorted(
+            open_teams, key=lambda t: (len(assignment[t["id"]]), t["sort_order"])
+        )[0]
         name = pick(t, pool)
         assignment[t["id"]].append(name)
         pool.remove(name)
@@ -131,7 +136,9 @@ def generate_schedule(available: list, teams: list, history: list) -> dict:
     return {"assignment": assignment, "unplaced": pool}
 
 
-def whatsapp_text(week_start: date, assignments_by_team: list, roster_full_names: dict) -> str:
+def whatsapp_text(
+    week_start: date, assignments_by_team: list, roster_full_names: dict
+) -> str:
     """assignments_by_team: [(team_name, [staff_form_name, ...])] in display order."""
     monday, friday = week_start, week_start
     if week_start.weekday() == 0:
