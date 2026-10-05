@@ -23,6 +23,8 @@ _ROLE_PERMISSIONS = {
 
 
 def has_permission(role: str | None, permission: str) -> bool:
+    if role is None:
+        return False
     if role == ADMIN:
         return True
     return permission in _ROLE_PERMISSIONS.get(role, frozenset())
