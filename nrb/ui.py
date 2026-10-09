@@ -65,3 +65,20 @@ def header(icon: str, title: str, subtitle: str = ""):
         f'<div class="nrb-bar"></div>{sub}</div>',
         unsafe_allow_html=True,
     )
+
+
+def demo_notice():
+    """Sidebar note explaining the demo data and the published logins."""
+    from nrb import config
+
+    accounts = "\n".join(
+        f"- **{username}** ({role})" for username, _, role in config.DEMO_ACCOUNTS
+    )
+    with st.sidebar:
+        st.info(
+            "**Demo build.** All names and figures are synthetic, generated for "
+            f"{config.DEMO_DATA_START:%B %Y} to {config.DEMO_AS_OF:%B %Y}. "
+            f"The demo treats {config.DEMO_AS_OF:%d %B %Y} as today.\n\n"
+            f"Try a login (password **{config.DEMO_PASSWORD}**):\n{accounts}\n\n"
+            "Changes are kept in memory and reset when the app restarts."
+        )

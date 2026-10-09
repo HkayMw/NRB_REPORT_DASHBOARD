@@ -37,6 +37,35 @@ month days only), the workbook is values-only and already named
   MongoDB Atlas, so nothing is lost on app restarts or redeploys. Form
   responses stay in Google Sheets as before.
 
+## Deployment modes
+
+One codebase runs both the office app and a public demo. The mode comes from
+the `APP_MODE` setting (environment variable or Streamlit secret).
+
+| | Live (default) | Demo (`APP_MODE = "demo"`) |
+|---|---|---|
+| Form responses | Google Sheet from `SHEET_URL` or Admin | `data/demo_responses.csv` (synthetic) |
+| Database | MongoDB Atlas (`MONGODB_URI`) | In-memory mongomock, no secrets needed |
+| Accounts | Created by the office admin | `demo_admin`, `demo_clerk`, `demo_viewer` (password `demo1234`), read-only |
+| Today | Real date | Fixed at 28 July 2028 |
+| Branding | Mzuzu NRB | Neutral "Registration Office (Demo)" |
+
+Live app secrets:
+
+```toml
+MONGODB_URI = "mongodb+srv://..."
+SHEET_URL = "https://docs.google.com/spreadsheets/d/<sheet id>/edit#gid=<gid>"
+```
+
+Demo app secrets:
+
+```toml
+APP_MODE = "demo"
+```
+
+To regenerate the synthetic demo data (June 2026 to July 2028, fictional
+names): `python -m scripts.generate_demo_data`.
+
 ## Database setup (one-time, free)
 
 1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas)
@@ -77,13 +106,14 @@ Run the same checks used by CI:
 ```bash
 python -m pytest tests -q
 python -m ruff check .
-python -m ruff format --check app.py nrb tests
+python -m ruff format --check app.py nrb tests scripts
 python -m mypy
 ```
 
 First run: the app asks you to create the admin account, then log in from the
-sidebar. Data source defaults to the office responses sheet; change it in
-**Admin → Data source** (the sheet must be shared "Anyone with link → Viewer").
+sidebar. The office sheet is never stored in the code. Set it as the
+`SHEET_URL` secret, or save it in **Admin → Data source** (the sheet must be
+shared "Anyone with link → Viewer").
 
 ## Deploy on Streamlit Community Cloud
 

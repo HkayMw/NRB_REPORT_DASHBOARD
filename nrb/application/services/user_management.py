@@ -5,6 +5,7 @@ from typing import Callable, Protocol
 
 from nrb.application.errors import call_infrastructure
 from nrb.application.services.authorization import AuthorizationService
+from nrb import config
 from nrb.domain import roles
 
 
@@ -81,6 +82,12 @@ class UserManagementService:
         actor: dict | None,
     ) -> None:
         principal = self.authorization.require_admin(actor)
+        target = self.repository.get_user_by_id(user_id)
+        if config.DEMO_MODE and (target or {}).get("username") in config.DEMO_USERNAMES:
+            raise PermissionError(
+                "The demo login accounts are read-only. Create a new user to try "
+                "editing accounts."
+            )
         if role not in roles.ROLES:
             raise ValueError("Role must be viewer, clerk or admin.")
         if principal["id"] == user_id and (role != roles.ADMIN or not active):

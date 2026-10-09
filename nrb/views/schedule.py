@@ -43,7 +43,8 @@ def _build_tab(schedule_service: ScheduleService, actor: dict | None):
         st.info("Add active teams and staff first (Manage teams / Admin → Roster).")
         return
 
-    next_monday = date.today() + timedelta(days=(7 - date.today().weekday()) % 7 or 7)
+    today = config.today()
+    next_monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
     week_start = st.date_input("Week starting (Monday)", next_monday)
     if week_start.weekday() != 0:
         st.error("Pick a Monday.")

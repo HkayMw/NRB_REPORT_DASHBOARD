@@ -89,7 +89,7 @@ def clean_responses(df: pd.DataFrame, roster_names: list, today=None) -> CleanRe
         df.loc[blank, "section"] = df.loc[blank].apply(infer_section, axis=1)
 
     issues = []
-    today = pd.Timestamp(today) if today else pd.Timestamp.now().normalize()
+    today = pd.Timestamp(today) if today else pd.Timestamp(config.today())
 
     unknown = df[~df["all_names_known"]]
     clean = df[

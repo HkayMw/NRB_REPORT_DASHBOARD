@@ -1,4 +1,4 @@
-"""Mzuzu NRB Report Dashboard — Streamlit entry point."""
+"""Report Dashboard: Streamlit entry point (live office app or public demo)."""
 
 import streamlit as st
 
@@ -23,10 +23,12 @@ from nrb.infrastructure.repositories.schedules import MongoScheduleRepository
 from nrb.infrastructure.repositories.users import MongoUserRepository
 from nrb.infrastructure.repositories import mongo as db
 from nrb.infrastructure.exporters import excel as export
-from nrb.infrastructure.data_sources import google_sheets as sheets
+from nrb.infrastructure.data_sources import demo_csv, google_sheets
 from nrb.domain import roles
 from nrb.domain.passwords import hash_password, verify_password
 from nrb.views import admin, compliance, monthly, overview, quality, schedule
+
+sheets = demo_csv if config.DEMO_MODE else google_sheets
 
 st.set_page_config(
     page_title=config.APP_TITLE,
@@ -73,6 +75,9 @@ except Exception as error:
     )
     st.stop()
 
+if config.DEMO_MODE:
+    db.ensure_demo_accounts(hash_password)
+
 user_repository = MongoUserRepository()
 authorization_service = AuthorizationService(user_repository)
 authentication_service = AuthenticationService(
@@ -85,6 +90,8 @@ if authentication_service.count_users() == 0 and not auth.is_logged_in():
     st.stop()
 
 auth.render_sidebar_auth(authentication_service)
+if config.DEMO_MODE:
+    ui.demo_notice()
 
 report_config_service = ReportConfigService(
     MongoReportConfigRepository(), authorization_service

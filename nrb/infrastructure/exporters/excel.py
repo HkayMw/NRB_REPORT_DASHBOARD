@@ -242,5 +242,6 @@ def _week_sheet(ws, cfg, wno, start, end, values):
 
 def suggested_filename(year: int, month: int) -> str:
     return (
-        f"{date(year, month, 1).strftime('%B').upper()} MONTHLY REPORT_MZUZU NRB.xlsx"
+        f"{date(year, month, 1).strftime('%B').upper()} MONTHLY REPORT_"
+        f"{config.OFFICE_SHORT}.xlsx"
     )

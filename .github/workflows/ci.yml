@@ -28,7 +28,7 @@ jobs:
         run: python -m ruff check .
 
       - name: Check Ruff formatting
-        run: python -m ruff format --check app.py nrb tests
+        run: python -m ruff format --check app.py nrb tests scripts
 
       - name: Run mypy
         run: python -m mypy

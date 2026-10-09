@@ -12,8 +12,10 @@ Public API (function names/shapes) is unchanged from the old SQLite layer;
 documents are returned as plain dicts with a string "id" key.
 """
 
-import os
+import json
 import logging
+import os
+from pathlib import Path
 from datetime import datetime, timezone
 
 import streamlit as st
@@ -32,7 +34,8 @@ def get_uri():
     try:
         return st.secrets["MONGODB_URI"]
     except Exception:
-        return None
+        # The public demo needs no secrets: fall back to in-memory MongoDB.
+        return "mongomock://local" if config.DEMO_MODE else None
 
 
 def configured() -> bool:
@@ -96,7 +99,7 @@ def init_db():
         db.staff.insert_many(
             [
                 {"form_name": fn, "full_name": full, "active": 1}
-                for fn, full in config.DEFAULT_ROSTER
+                for fn, full in config.default_roster()
             ]
         )
     if db.teams.count_documents({}) == 0:
@@ -111,9 +114,56 @@ def init_db():
                     "active": 1,
                     "sort_order": i,
                 }
-                for i, (name, section, mn, mx) in enumerate(config.DEFAULT_TEAMS)
+                for i, (name, section, mn, mx) in enumerate(config.default_teams())
             ]
         )
+    if config.DEMO_MODE and db.schedules.count_documents({}) == 0:
+        _seed_demo_schedules(db)
+
+
+DEMO_SCHEDULES = Path(__file__).resolve().parents[3] / "data" / "demo_schedules.json"
+
+
+def _seed_demo_schedules(db):
+    """Load the synthetic weekly schedules that match the demo responses."""
+    if not DEMO_SCHEDULES.exists():
+        return
+    team_ids = {t["name"]: str(t["_id"]) for t in db.teams.find()}
+    docs = []
+    for sched in json.loads(DEMO_SCHEDULES.read_text()):
+        docs.append(
+            {
+                "week_start": sched["week_start"],
+                "week_end": sched["week_end"],
+                "created_by": "demo_clerk",
+                "created_at": _now(),
+                "assignments": [
+                    {
+                        "team_id": team_ids[a["team_name"]],
+                        "staff_name": a["staff_name"],
+                        "position": a["position"],
+                    }
+                    for a in sched["assignments"]
+                    if a["team_name"] in team_ids
+                ],
+            }
+        )
+    if docs:
+        db.schedules.insert_many(docs)
+
+
+def ensure_demo_accounts(hash_password):
+    """Make sure the published demo logins always exist and are active.
+
+    Cheap on every rerun: a password is only hashed when an account is missing.
+    """
+    users = _db().users
+    for username, full_name, role in config.DEMO_ACCOUNTS:
+        doc = users.find_one({"username": username})
+        if doc is None:
+            create_user(username, hash_password(config.DEMO_PASSWORD), role, full_name)
+        elif doc.get("active") != 1 or doc.get("role") != role:
+            users.update_one({"_id": doc["_id"]}, {"$set": {"active": 1, "role": role}})
 
 
 # ---------- settings ----------

@@ -1,11 +1,11 @@
 """Who reported what: daily scheduled-vs-reported check, section coverage
 grid, and per-person activity."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 import streamlit as st
 
-from nrb import data, ui
+from nrb import config, data, ui
 from nrb.application.services.load_reporting_data import ReportingDataService
 from nrb.application.services.schedule_management import ScheduleService
 from nrb.domain import reporting_analytics, weeks
@@ -82,7 +82,7 @@ def render(
 
 
 def _render_daily(schedule_service: ScheduleService, clean):
-    today = date.today()
+    today = config.today()
     picked = st.date_input("Week containing", value=today, key="comp_week")
     monday, _ = weeks.work_week_of(picked)
     st.caption(weeks.pretty_range(monday, monday + timedelta(days=6)))

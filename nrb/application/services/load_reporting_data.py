@@ -39,6 +39,12 @@ class ReportingDataService:
             sheet_url = self.repository.get_setting(
                 "sheet_url", config.DEFAULT_SHEET_URL
             )
+            if not sheet_url:
+                raise ApplicationError(
+                    "No data source is configured yet. An admin can set the Google "
+                    "Sheet URL in Admin -> Data source, or set SHEET_URL in the "
+                    "app secrets."
+                )
             raw = self.source.fetch_responses(sheet_url)
             roster = [staff["form_name"] for staff in self.repository.list_staff()]
         except ApplicationError:
