@@ -110,6 +110,28 @@ SECTION_FIELDS = {
     ],
 }
 
+# The demo replaces office-specific form codes with generic names.
+DEMO_FIELD_RENAMES = {
+    "NR8 forms collected": "Birth registration forms collected",
+    "NR8 forms entered": "Birth registration forms entered",
+    "NR8 forms approved": "Birth registration forms approved",
+    "NR10 forms collected": "Death registration forms collected",
+    "NR10 forms entered": "Death registration forms entered",
+    "NR10 forms approved": "Death registration forms approved",
+}
+DEMO_LABEL_RENAMES = {
+    "NR8 FORMS ENTERED": "BIRTH FORMS ENTERED",
+    "NR8 FORMS COLLECTED": "BIRTH FORMS COLLECTED",
+    "NR10 FORMS ENTERED": "DEATH FORMS ENTERED",
+    "NR10 APPROVED": "DEATH FORMS APPROVED",
+    "NR10 FORMS COLLECTED": "DEATH FORMS COLLECTED",
+}
+if DEMO_MODE:
+    SECTION_FIELDS = {
+        section: [DEMO_FIELD_RENAMES.get(f, f) for f in fields]
+        for section, fields in SECTION_FIELDS.items()
+    }
+
 ALL_NUMERIC_FIELDS = [f for fields in SECTION_FIELDS.values() for f in fields]
 
 # Current form dropdown roster (initials format).
@@ -201,10 +223,14 @@ DEFAULT_PLANNED_ACTIVITIES = (
     "1.Continue with ID registration and distribution\n"
     "2.Issue out birth and death certificates\n"
     "3.Print out birth and death certificates\n"
-    "4.Monitor and collect NR8 and NR10 forms"
+    + (
+        "4.Monitor and collect birth and death registration forms"
+        if DEMO_MODE
+        else "4.Monitor and collect NR8 and NR10 forms"
+    )
 )
 DEFAULT_COMPILED_BY = (
-    "COMPILED BY  DEMO ARO\nFOR DEMO PRO."
+    "COMPILED BY  OFFICE SUPERVISOR\nFOR DISTRICT REGISTRAR."
     if DEMO_MODE
     else "COMPILED BY  MZUZU ARO\nFOR MZUZU PRO."
 )

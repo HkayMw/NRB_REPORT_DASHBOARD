@@ -257,7 +257,11 @@ def _database_tab(database_backup_service: DatabaseBackupService, actor: dict | 
             json.dumps(
                 database_backup_service.create_backup(actor), indent=2, default=str
             ),
-            file_name="nrb_dashboard_backup.json",
+            file_name=(
+                "dashboard_backup.json"
+                if config.DEMO_MODE
+                else "nrb_dashboard_backup.json"
+            ),
             mime="application/json",
         )
     up = st.file_uploader("Restore from backup (.json)", type=["json"])

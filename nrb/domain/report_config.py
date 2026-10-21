@@ -144,6 +144,34 @@ DEFAULT_REPORT_CONFIG = {
 }
 
 
+def _generic_layout(cfg: dict) -> dict:
+    """Demo copy of the layout with office-specific form codes renamed."""
+    groups = []
+    for group in cfg["groups"]:
+        blocks = []
+        for block in group["blocks"]:
+            rows = [
+                {
+                    **row,
+                    "label": config.DEMO_LABEL_RENAMES.get(row["label"], row["label"]),
+                    "fields": [
+                        config.DEMO_FIELD_RENAMES.get(f, f) for f in row["fields"]
+                    ],
+                    "summary_label": config.DEMO_LABEL_RENAMES.get(
+                        row["summary_label"], row["summary_label"]
+                    ),
+                }
+                for row in block["rows"]
+            ]
+            blocks.append({**block, "rows": rows})
+        groups.append({**group, "blocks": blocks})
+    return {"groups": groups}
+
+
+if config.DEMO_MODE:
+    DEFAULT_REPORT_CONFIG = _generic_layout(DEFAULT_REPORT_CONFIG)
+
+
 def validate(cfg) -> list:
     errors = []
     groups = cfg.get("groups")

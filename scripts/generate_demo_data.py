@@ -11,6 +11,7 @@ Everything is fictional. Run again with the same seed to get the same files:
 
 import json
 import math
+import os
 import random
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -18,7 +19,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from nrb import config
+os.environ["APP_MODE"] = "demo"  # generate with the demo's generic field names
+
+from nrb import config  # noqa: E402
 
 SEED = 2026
 START = config.DEMO_DATA_START
@@ -47,19 +50,25 @@ PROFILES = {
     },
     "Tracking": {"IDs tracked": 64},
     "CRVS Team (Office)": {
-        "NR8 forms collected": 14,
-        "NR8 forms entered": 19,
-        "NR8 forms approved": 15,
+        "Birth registration forms collected": 14,
+        "Birth registration forms entered": 19,
+        "Birth registration forms approved": 15,
         "Birth certificates printed": 13,
         "Birth certificates issued": 11,
         "Duplicate Birth records resolved": 1,
     },
-    "District Hospital Team": {"NR8 forms collected": 21, "NR8 forms entered": 16},
-    "Health Centre Team": {"NR8 forms collected": 11, "NR8 forms entered": 8},
+    "District Hospital Team": {
+        "Birth registration forms collected": 21,
+        "Birth registration forms entered": 16,
+    },
+    "Health Centre Team": {
+        "Birth registration forms collected": 11,
+        "Birth registration forms entered": 8,
+    },
     "Deaths Desk": {
-        "NR10 forms collected": 4,
-        "NR10 forms entered": 4,
-        "NR10 forms approved": 3,
+        "Death registration forms collected": 4,
+        "Death registration forms entered": 4,
+        "Death registration forms approved": 3,
         "Death certificates printed": 2,
         "Death certificates issued": 2,
         "Duplicate death records resolved": 0.3,
