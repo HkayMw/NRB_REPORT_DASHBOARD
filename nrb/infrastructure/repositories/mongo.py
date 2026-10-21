@@ -5,6 +5,9 @@ Connection string comes from (in order):
 2. st.secrets["MONGODB_URI"]  (.streamlit/secrets.toml locally, or the
    Secrets box on Streamlit Community Cloud)
 
+Demo mode (APP_MODE = "demo") always uses an in-memory database and ignores
+any MONGODB_URI, so the public demo can never read or write real data.
+
 Special URI "mongomock://local" runs an in-memory fake MongoDB — handy for
 tests and quick local demos (data lost when the process exits).
 
@@ -28,14 +31,17 @@ logger = logging.getLogger("nrb.infrastructure.mongo")
 
 
 def get_uri():
+    # The demo must never touch a real database, even when a MONGODB_URI is
+    # present in the environment or secrets (e.g. a developer's local setup).
+    if config.DEMO_MODE:
+        return "mongomock://local"
     uri = os.environ.get("MONGODB_URI")
     if uri:
         return uri
     try:
         return st.secrets["MONGODB_URI"]
     except Exception:
-        # The public demo needs no secrets: fall back to in-memory MongoDB.
-        return "mongomock://local" if config.DEMO_MODE else None
+        return None
 
 
 def configured() -> bool:

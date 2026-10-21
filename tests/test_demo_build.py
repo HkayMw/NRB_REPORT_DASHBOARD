@@ -1,5 +1,7 @@
 """Checks for the public demo build: synthetic data, seeding and demo logins."""
 
+import os
+
 import mongomock
 import pandas as pd
 import pytest
@@ -90,3 +92,44 @@ def test_demo_accounts_cannot_be_edited(demo_db):
     viewer = repository.get_user("demo_viewer")
     with pytest.raises(PermissionError):
         service.update_user(viewer["id"], "viewer", True, "newpassword", admin)
+
+
+def test_demo_mode_ignores_real_mongodb_uri(monkeypatch):
+    monkeypatch.setattr(config, "DEMO_MODE", True)
+    monkeypatch.setenv("MONGODB_URI", "mongodb+srv://user:pw@real-cluster.example/")
+    assert mongo.get_uri() == "mongomock://local"
+
+
+def test_live_mode_uses_configured_mongodb_uri(monkeypatch):
+    monkeypatch.setattr(config, "DEMO_MODE", False)
+    monkeypatch.setenv("MONGODB_URI", "mongodb+srv://user:pw@real-cluster.example/")
+    assert mongo.get_uri() == "mongodb+srv://user:pw@real-cluster.example/"
+
+
+def test_demo_build_has_no_office_specific_codes():
+    """Load the app config in demo mode and check no NRB form codes or titles remain."""
+    import subprocess
+    import sys
+
+    script = (
+        "import json\n"
+        "from nrb import config\n"
+        "from nrb.domain import report_config\n"
+        "from nrb.infrastructure.data_sources import demo_csv\n"
+        "raw = demo_csv.fetch_responses.__wrapped__('x')\n"
+        "print(json.dumps([config.ALL_NUMERIC_FIELDS, report_config.DEFAULT_REPORT_CONFIG,\n"
+        "    config.DEFAULT_PLANNED_ACTIVITIES, config.DEFAULT_COMPILED_BY, list(raw.columns),\n"
+        "    report_config.validate(report_config.DEFAULT_REPORT_CONFIG)]))\n"
+    )
+    env = {**os.environ, "APP_MODE": "demo"}
+    out = subprocess.run(
+        [sys.executable, "-c", script],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    text = out.upper()
+    for code in ("NR8", "NR10", "ARO", "PRO.", "MZUZU", "NRB"):
+        assert code not in text, code
+    assert out.rstrip().endswith("[]]")  # the demo layout validates cleanly
