@@ -134,32 +134,10 @@ if DEMO_MODE:
 
 ALL_NUMERIC_FIELDS = [f for fields in SECTION_FIELDS.values() for f in fields]
 
-# Current form dropdown roster (initials format).
-DEFAULT_ROSTER = [
-    ("S.Chirwa", "Stella Chirwa"),
-    ("W.Mwamsango", "Wigly Mwamsango"),
-    ("N.Nyalugwe", "Nathan Nyalugwe"),
-    ("D.Kayira", "Daniel Kayira"),
-    ("E.Chimbalanga", "Emmanuel Chimbalanga"),
-    ("L.Chirwa", "Lawrence Chirwa"),
-    ("H.Kanyumbu", "Harry Kanyumbu"),
-    ("D.Chimera", "Dalitso Chimera"),
-    ("T.Ng'ambi", "Temwanani Ng'ambi"),
-    ("B.Jeke", "Bennita Jeke"),
-    ("K.Zirenga", "Kenneth Zirenga"),
-    ("M.Chirwa", "Macson Chirwa"),
-    ("M.Mbewe", "M. Mbewe"),
-    ("T.Mwenelupembe", "Towera Mwenelupembe"),
-    ("A.Nkata", "Ancent Nkata"),
-    ("D.Lobe", "Deborah Lobe"),
-    ("S.Gondwe", "Shuppie Gondwe"),
-    ("L.Chilinda", "Linda Chilinda"),
-    ("O.Chibalazi", "O. Chibalazi"),
-    ("S.Chipeta", "Stanley Chipeta"),
-    ("L.Khunga", "Laston Khunga"),
-    ("E.Thera", "Eliam Thera"),
-    ("C.Mzumara", "C. Mzumara"),
-]
+# The live roster is kept only in the database (Admin -> Roster), never in
+# code, so staff names are not published with the source. A new live
+# database starts with an empty roster for an admin to fill in.
+DEFAULT_ROSTER: list[tuple[str, str]] = []
 
 DEFAULT_TEAMS = [
     # (name, reports_as_section, min_size, max_size)

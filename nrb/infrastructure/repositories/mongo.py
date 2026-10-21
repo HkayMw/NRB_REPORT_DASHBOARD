@@ -101,7 +101,7 @@ def init_db():
     db.staff.create_index("form_name", unique=True)
     db.teams.create_index("name", unique=True)
     db.schedules.create_index("week_start", unique=True)
-    if db.staff.count_documents({}) == 0:
+    if db.staff.count_documents({}) == 0 and config.default_roster():
         db.staff.insert_many(
             [
                 {"form_name": fn, "full_name": full, "active": 1}

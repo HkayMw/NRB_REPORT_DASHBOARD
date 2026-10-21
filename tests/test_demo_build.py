@@ -77,9 +77,7 @@ def test_live_mode_seeds_no_demo_data(monkeypatch):
     monkeypatch.setattr(mongo, "_client", lambda uri: client)
     mongo.init_db()
     assert mongo.list_schedules() == []
-    assert {s["form_name"] for s in mongo.list_staff()} == {
-        form for form, _ in config.DEFAULT_ROSTER
-    }
+    assert mongo.list_staff() == []  # live roster comes from the database only
 
 
 def test_demo_accounts_cannot_be_edited(demo_db):

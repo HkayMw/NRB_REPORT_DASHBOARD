@@ -12,14 +12,14 @@ def test_clean_responses_keeps_latest_duplicate_and_reports_quality_findings():
                 "2026-09-02 09:00:00",
                 "2026-09-01 11:00:00",
             ],
-            "Name": ["S.Chirwa", "S.Chirwa", "Unknown", "W.Mwamsango"],
+            "Name": ["J.Doe", "J.Doe", "Unknown", "M.Smith"],
             "Date": ["2026-09-01", "2026-09-01", "2026-09-02", "2026-09-10"],
             "Assigned Section": ["ID CAPTURING"] * 4,
             "New applicants captured": [1, 3, 5, 2],
         }
     )
 
-    result = clean_responses(responses, ["S.Chirwa", "W.Mwamsango"], today="2026-09-05")
+    result = clean_responses(responses, ["J.Doe", "M.Smith"], today="2026-09-05")
 
     assert len(result.clean) == 2
     assert (

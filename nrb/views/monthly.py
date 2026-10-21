@@ -25,7 +25,10 @@ def render(
     data.refresh_button(reporting_data_service.clear_cache)
     clean = res.clean
     if clean.empty:
-        st.info("No clean submissions found yet.")
+        st.info(
+            "No clean submissions found yet. If Data quality lists rows under "
+            "unknown names, add those names in Admin -> Roster."
+        )
         return
 
     months = sorted(clean["date"].dt.to_period("M").unique(), reverse=True)

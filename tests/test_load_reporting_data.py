@@ -15,7 +15,7 @@ class FakeRepository:
 
     def list_staff(self, active_only=False):
         self.calls.append(("roster", active_only))
-        return [{"form_name": "S.Chirwa"}]
+        return [{"form_name": "J.Doe"}]
 
 
 class FakeSource:
@@ -36,7 +36,7 @@ def test_execute_fetches_sheet_and_roster_then_cleans_responses():
     raw = pd.DataFrame(
         {
             "Timestamp": ["2026-09-01 09:00:00"],
-            "Name": ["S.Chirwa"],
+            "Name": ["J.Doe"],
             "Date": ["2026-09-01"],
             "Assigned Section": ["ID CAPTURING"],
         }
