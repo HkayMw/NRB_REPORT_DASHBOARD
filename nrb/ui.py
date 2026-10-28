@@ -5,7 +5,10 @@ import streamlit as st
 _CSS = """
 <style>
 /* Hide Streamlit chrome viewers don't need */
-#MainMenu, footer, [data-testid="stToolbar"], .stDeployButton,
+/* Hide the hosting toolbar's Fork / GitHub / Deploy buttons and the footer.
+   Keep [data-testid="stToolbar"] itself visible: it also holds the button
+   that re-opens a collapsed sidebar. */
+[data-testid="stToolbarActions"], .stDeployButton, footer,
 [data-testid="stDecoration"] { display: none !important; }
 
 /* Tighter, capped content column (leave room for the fixed app header) */
