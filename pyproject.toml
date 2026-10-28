@@ -1,0 +1,29 @@
+[project]
+name = "nrb-report-dashboard"
+version = "0.1.0"
+description = "Streamlit daily reporting, scheduling and monthly report dashboard for a registration office"
+requires-python = ">=3.11,<3.12"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+src = ["nrb", "tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["nrb"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["nrb.infrastructure.*"]
+disallow_untyped_defs = false

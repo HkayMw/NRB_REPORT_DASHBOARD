@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/*.db
+data/*.db-*
+.streamlit/secrets.toml
+*.xlsx
+~$*
+.env
+
+# Tool caches and personal editor/assistant settings
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.vscode/
+.claude/
