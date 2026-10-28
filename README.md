@@ -43,13 +43,13 @@ month days only), the workbook is values-only and already named
 One codebase runs both the office app and a public demo. The mode comes from
 the `APP_MODE` setting (environment variable or Streamlit secret).
 
-| | Live (default) | Demo (`APP_MODE = "demo"`) |
-|---|---|---|
-| Form responses | Google Sheet from `SHEET_URL` or Admin | `data/demo_responses.csv` (synthetic) |
-| Database | MongoDB Atlas (`MONGODB_URI`) | In-memory mongomock, no secrets needed |
-| Accounts | Created by the office admin | `demo_admin`, `demo_clerk`, `demo_viewer` (password `demo1234`), read-only |
-| Today | Real date | Fixed at 28 July 2028 |
-| Branding | From the office settings below | Neutral "Registration Office (Demo)" |
+|                | Live (default)                         | Demo (`APP_MODE = "demo"`)                                                 |
+| -------------- | -------------------------------------- | -------------------------------------------------------------------------- |
+| Form responses | Google Sheet from `SHEET_URL` or Admin | `data/demo_responses.csv` (synthetic)                                      |
+| Database       | MongoDB Atlas (`MONGODB_URI`)          | In-memory mongomock, no secrets needed                                     |
+| Accounts       | Created by the office admin            | `demo_admin`, `demo_clerk`, `demo_viewer` (password `demo1234`), read-only |
+| Today          | Real date                              | Fixed at 28 July 2028                                                      |
+| Branding       | From the office settings below         | Neutral "Registration Office (Demo)"                                       |
 
 Live app secrets:
 
@@ -145,3 +145,7 @@ backup/restore of app data (accounts, teams, schedules, settings).
   (e.g. CRVS office team + hospital teams).
 - Sections missing `Assigned Section` (old rows) are inferred from which
   fields were filled.
+
+## Copyright
+
+© 2026 Harry Kanyumbu. All rights reserved.
